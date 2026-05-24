@@ -1,6 +1,7 @@
 package install
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,13 +9,14 @@ import (
 	"testing"
 )
 
-func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
+func TestInstallPrintsConfigChangeWithoutTouchingConfigAndPreservesHookEntries(t *testing.T) {
 	home := t.TempDir()
 	codexHome := filepath.Join(home, ".codex")
 	if err := os.MkdirAll(codexHome, 0o755); err != nil {
 		t.Fatalf("mkdir codex home: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("model = \"old\"\n[features]\nhooks = false\n"), 0o644); err != nil {
+	originalConfig := []byte("model = \"old\"\n[features]\nhooks = false\ncodex_hooks = false\n")
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), originalConfig, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 	existingHooks := []byte(`{"hooks":{"Stop":[{"command":"echo keep"}]}}`)
@@ -22,6 +24,7 @@ func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
 		t.Fatalf("write hooks: %v", err)
 	}
 
+	var out bytes.Buffer
 	err := Install(Options{
 		HomeDir:        home,
 		BinaryPath:     "/usr/local/bin/codex-quick-model-switch",
@@ -31,13 +34,14 @@ func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
 		HookEnvPath:    filepath.Join(home, ".qms.env"),
 		ProviderName:   "codex-quick-model-switch",
 		ProviderAPIKey: "local-router",
+		Output:         &out,
 	})
 	if err != nil {
 		t.Fatalf("Install returned error: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(codexHome, "config.toml.bak-test")); err != nil {
-		t.Fatalf("config backup missing: %v", err)
+	if _, err := os.Stat(filepath.Join(codexHome, "config.toml.bak-test")); !os.IsNotExist(err) {
+		t.Fatalf("config backup should not be created, stat error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(codexHome, "hooks.json.bak-test")); err != nil {
 		t.Fatalf("hooks backup missing: %v", err)
@@ -47,8 +51,14 @@ func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	configText := string(configBytes)
+	if !bytes.Equal(configBytes, originalConfig) {
+		t.Fatalf("config.toml was modified:\n%s", configBytes)
+	}
+
+	output := out.String()
 	for _, want := range []string{
+		"Please update",
+		filepath.Join(codexHome, "config.toml"),
 		`model = 'codex-quick-model-switch'`,
 		`model_provider = 'codex-quick-model-switch'`,
 		`hooks = true`,
@@ -56,8 +66,8 @@ func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
 		`wire_api = 'responses'`,
 		`requires_openai_auth = true`,
 	} {
-		if !contains(configText, want) {
-			t.Fatalf("config missing %q:\n%s", want, configText)
+		if !contains(output, want) {
+			t.Fatalf("installer output missing %q:\n%s", want, output)
 		}
 	}
 
@@ -74,6 +84,18 @@ func TestInstallBacksUpConfigEnablesHooksAndPreservesHookEntries(t *testing.T) {
 	}
 	if !contains(string(hooksBytes), "UserPromptSubmit") || !contains(string(hooksBytes), "codex-quick-model-switch hook") {
 		t.Fatalf("switch hook not installed:\n%s", hooksBytes)
+	}
+
+	rootHooks := hooks["hooks"].(map[string]any)
+	userPromptSubmit := rootHooks["UserPromptSubmit"].([]any)
+	group := userPromptSubmit[0].(map[string]any)
+	if _, ok := group["command"]; ok {
+		t.Fatalf("UserPromptSubmit entry used obsolete flat command shape:\n%s", hooksBytes)
+	}
+	handlers := group["hooks"].([]any)
+	handler := handlers[0].(map[string]any)
+	if handler["type"] != "command" || !contains(handler["command"].(string), "codex-quick-model-switch hook") {
+		t.Fatalf("UserPromptSubmit command hook not installed with current schema:\n%s", hooksBytes)
 	}
 }
 

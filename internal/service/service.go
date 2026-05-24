@@ -43,6 +43,11 @@ func Install(binaryPath, envPath string) error {
 }
 
 func Start() error {
+	if _, err := os.Stat(plistPath()); os.IsNotExist(err) {
+		return fmt.Errorf("service is not installed; run codex-quick-model-switch service install first")
+	} else if err != nil {
+		return err
+	}
 	return launchctl("bootstrap", "gui/"+uid(), plistPath())
 }
 

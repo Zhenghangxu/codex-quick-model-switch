@@ -37,6 +37,18 @@ func TestParseSwitchesRejectsInvalidShortcut(t *testing.T) {
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("HOME", "/Users/example")
+	for _, key := range []string{
+		"QMS_LISTEN_ADDR",
+		"QMS_ROUTER_BASE_URL",
+		"QMS_UPSTREAM_BASE_URL",
+		"QMS_ROUTER_API_KEY",
+		"QMS_UPSTREAM_API_KEY",
+		"QMS_VIRTUAL_MODEL",
+		"QMS_STATE_PATH",
+		"QMS_SWITCHES",
+	} {
+		t.Setenv(key, "")
+	}
 	cfg, err := Load("")
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)

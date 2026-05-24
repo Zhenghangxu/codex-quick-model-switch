@@ -1,0 +1,246 @@
+# Codex Quick Model Switch
+
+`codex-quick-model-switch` is a small local router for Codex that lets you switch the model, reasoning effort, and service tier by typing short commands such as `/msl`, `/msm`, `/msh`, or `/msxh`.
+
+It is designed for manual switching only. There is no classifier, no prompt extraction, no automatic routing, and no Groq dependency.
+
+## How It Works
+
+The tool has two moving parts:
+
+1. A Codex `UserPromptSubmit` hook watches each user prompt before it reaches the model.
+2. A local router listens on `127.0.0.1:8321` and proxies Codex model requests upstream.
+
+When you type a switch shortcut, for example:
+
+```text
+/msh
+```
+
+the hook calls the local router, updates the active switch state, sends a quiet macOS notification, and returns:
+
+```json
+{"decision":"block","reason":"Switched Codex model to gpt-5.5 (high)."}
+```
+
+That blocks the shortcut prompt so `/msh` is not sent to the model. Your next normal prompt is routed using the active switch.
+
+For normal proxying, the router keeps requests as stable as possible. If the request model is not the virtual model, the body is forwarded unchanged. If the request model is `codex-quick-model-switch`, only these fields are patched:
+
+- `model`
+- `reasoning.effort` for Responses API requests
+- `reasoning_effort` for Chat Completions compatibility
+- top-level `service_tier`
+
+Everything else, including prompt input, tools, metadata, and unrelated fields, is preserved.
+
+## Default Shortcuts
+
+| Shortcut | Model | Reasoning effort | Service tier |
+| --- | --- | --- | --- |
+| `/msl` | `gpt-5.3-codex` | `medium` | none |
+| `/msm` | `gpt-5.5` | `medium` | `fast` |
+| `/msh` | `gpt-5.5` | `high` | standard/default |
+| `/msxh` | `gpt-5.5` | `xhigh` | standard/default |
+
+Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, and `standard` sends the upstream-compatible default value currently used by this tool.
+
+## Install
+
+Build the binary first:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+make build
+```
+
+Run the installer from the built binary:
+
+```bash
+./bin/codex-quick-model-switch install
+```
+
+Do not use `go run ... install`. The installer records the executable path in the Codex hook command, so it should be the real built binary path.
+
+The installer will:
+
+- create `~/.codex-quick-model-switch.env` if it does not exist
+- back up `~/.codex/hooks.json`
+- print the required `~/.codex/config.toml` changes for you to apply manually
+- add a `UserPromptSubmit` hook entry while preserving existing hooks
+
+After the installer runs, edit `~/.codex/config.toml` with the settings printed in the terminal. Those settings enable `features.hooks = true`, set Codex to use the virtual model `codex-quick-model-switch`, and add a custom model provider pointing to the local router.
+
+## Start The Router
+
+Install and start the macOS LaunchAgent:
+
+```bash
+./bin/codex-quick-model-switch service install
+./bin/codex-quick-model-switch service start
+```
+
+Check status:
+
+```bash
+./bin/codex-quick-model-switch service status
+```
+
+Check router health:
+
+```bash
+./bin/codex-quick-model-switch doctor
+```
+
+You can also run the router manually:
+
+```bash
+./bin/codex-quick-model-switch serve --env ~/.codex-quick-model-switch.env
+```
+
+## Configure Codex Authentication
+
+The router protects local endpoints with `QMS_ROUTER_API_KEY`.
+
+The installer creates this key in:
+
+```text
+~/.codex-quick-model-switch.env
+```
+
+Codex also needs the same value available as `QMS_ROUTER_API_KEY` when it sends requests to the local provider. If you launch Codex from a shell, export it first:
+
+```bash
+export QMS_ROUTER_API_KEY="$(grep '^QMS_ROUTER_API_KEY=' ~/.codex-quick-model-switch.env | cut -d= -f2-)"
+codex
+```
+
+If you launch Codex Desktop from Finder or another app launcher, make sure the app environment includes the same variable, or edit the provider auth settings in `~/.codex/config.toml` to match your local setup.
+
+Restart Codex after installation so it reloads `config.toml` and `hooks.json`.
+
+## Use It
+
+Once the router is running and Codex has reloaded config:
+
+1. Open Codex.
+2. Type one of the shortcuts as the whole prompt, such as `/msm`.
+3. You should see a quiet macOS notification.
+4. The shortcut prompt is blocked.
+5. Send your next normal prompt. It will use the selected model settings.
+
+Examples:
+
+```text
+/msl
+```
+
+Switch to `gpt-5.3-codex` with medium reasoning and no service tier.
+
+```text
+/msh
+```
+
+Switch to `gpt-5.5` with high reasoning and standard/default service tier.
+
+## Configuration
+
+Configuration is read from environment variables and from an optional `.env` file passed with `--env`.
+
+Default env file:
+
+```text
+~/.codex-quick-model-switch.env
+```
+
+Supported variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `QMS_LISTEN_ADDR` | `127.0.0.1:8321` | Local router listen address |
+| `QMS_ROUTER_BASE_URL` | derived from listen address | Base URL used by the hook and doctor |
+| `QMS_ROUTER_API_KEY` | generated by installer | Bearer token required by router endpoints |
+| `QMS_UPSTREAM_BASE_URL` | `http://localhost:8317/v1` | Upstream OpenAI-compatible proxy base URL |
+| `QMS_UPSTREAM_API_KEY` | empty | Optional bearer token for the upstream proxy |
+| `QMS_VIRTUAL_MODEL` | `codex-quick-model-switch` | Virtual model name Codex sends to this router |
+| `QMS_SWITCHES` | default shortcut list | Comma-separated shortcut mapping |
+| `QMS_STATE_PATH` | `~/Library/Application Support/codex-quick-model-switch/state.json` | Active switch state file |
+
+`QMS_SWITCHES` format:
+
+```text
+/shortcut=model:reasoning_effort:service_tier
+```
+
+Example:
+
+```text
+QMS_SWITCHES=/mini=gpt-5.4-mini:low:fast,/deep=gpt-5.5:xhigh:standard
+```
+
+Allowed reasoning efforts:
+
+```text
+minimal, low, medium, high, xhigh
+```
+
+Allowed service tiers:
+
+```text
+none, fast, standard
+```
+
+## Commands
+
+```bash
+./bin/codex-quick-model-switch serve --env ~/.codex-quick-model-switch.env
+./bin/codex-quick-model-switch hook --env ~/.codex-quick-model-switch.env
+./bin/codex-quick-model-switch gen-key
+./bin/codex-quick-model-switch install
+./bin/codex-quick-model-switch doctor
+./bin/codex-quick-model-switch service install
+./bin/codex-quick-model-switch service start
+./bin/codex-quick-model-switch service stop
+./bin/codex-quick-model-switch service status
+./bin/codex-quick-model-switch service uninstall
+```
+
+## Troubleshooting
+
+If `doctor` fails:
+
+- make sure the service is started
+- check `QMS_LISTEN_ADDR`
+- try running `serve --env ~/.codex-quick-model-switch.env` manually
+
+If Codex says the provider is unauthorized:
+
+- make sure Codex has `QMS_ROUTER_API_KEY` in its environment
+- make sure the value matches `~/.codex-quick-model-switch.env`
+- restart Codex after changing environment or config
+
+If shortcuts reach the model instead of being blocked:
+
+- make sure `features.hooks = true` exists in `~/.codex/config.toml`
+- make sure `~/.codex/hooks.json` contains a `UserPromptSubmit` command for this binary
+- restart Codex after installing hooks
+
+If a switch command fails:
+
+- check that the router is healthy with `doctor`
+- verify that the shortcut exists in `QMS_SWITCHES`
+- check the service status with `service status`
+
+## Development
+
+Run tests:
+
+```bash
+go test ./...
+```
+
+Build:
+
+```bash
+make build
+```

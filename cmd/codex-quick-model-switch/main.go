@@ -89,6 +89,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			HookEnvPath:    envPath,
 			ProviderName:   "codex-quick-model-switch",
 			ProviderAPIKey: "QMS_ROUTER_API_KEY",
+			Output:         stdout,
 		})
 	case "doctor":
 		cfg, err := config.Load("")
