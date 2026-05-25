@@ -48,7 +48,7 @@ EMPTY=
           listenAddr: "127.0.0.1:8321",
           upstreamBaseUrl: "http://localhost:8317/v1",
           upstreamApiKey: "",
-          switches: "/msm=gpt-5.5:medium:fast",
+          switches: "/medium=gpt-5.5:medium:fast",
         },
         () => "generated-router-key",
       ),
@@ -62,7 +62,7 @@ EMPTY=
         listenAddr: "127.0.0.1:8321",
         upstreamBaseUrl: "http://localhost:8317/v1",
         upstreamApiKey: "upstream-key",
-        switches: "/msm=gpt-5.5:medium:fast",
+        switches: "/medium=gpt-5.5:medium:fast",
       },
       () => "generated-router-key",
     );
@@ -73,7 +73,7 @@ EMPTY=
 
   it("formats env values in a stable order", () => {
     const text = formatEnvFile({
-      QMS_SWITCHES: "/msm=gpt-5.5:medium:fast",
+      QMS_SWITCHES: "/medium=gpt-5.5:medium:fast",
       QMS_ROUTER_API_KEY: "router-key",
       QMS_UPSTREAM_API_KEY: "upstream-key",
       QMS_LISTEN_ADDR: "127.0.0.1:8321",
@@ -88,7 +88,7 @@ EMPTY=
         "QMS_UPSTREAM_BASE_URL=http://localhost:8317/v1",
         "QMS_UPSTREAM_API_KEY=upstream-key",
         "QMS_VIRTUAL_MODEL=codex-quick-model-switch",
-        "QMS_SWITCHES=/msm=gpt-5.5:medium:fast",
+        "QMS_SWITCHES=/medium=gpt-5.5:medium:fast",
         "",
       ].join("\n"),
     );
@@ -99,7 +99,7 @@ EMPTY=
       listenAddr: "127.0.0.1:8321",
       upstreamBaseUrl: "http://localhost:8317/v1",
       upstreamApiKey: "upstream-key",
-      switches: "/msm=gpt-5.5:medium:fast",
+      switches: "/medium=gpt-5.5:medium:fast",
     });
 
     expect(status.exists).toBe(false);
@@ -115,7 +115,7 @@ EMPTY=
         listenAddr: "127.0.0.1:8321",
         upstreamBaseUrl: "http://localhost:8317/v1/",
         upstreamApiKey: "new-upstream-key",
-        switches: "/msm=gpt-5.5:medium:fast",
+        switches: "/medium=gpt-5.5:medium:fast",
       },
       async () => ({
         exists: true,
@@ -125,7 +125,7 @@ EMPTY=
           QMS_UPSTREAM_BASE_URL: "http://localhost:8317/v1",
           QMS_UPSTREAM_API_KEY: "old-upstream-key",
           QMS_VIRTUAL_MODEL: "codex-quick-model-switch",
-          QMS_SWITCHES: "/msl=gpt-5.3-codex:medium:none",
+          QMS_SWITCHES: "/light=gpt-5.3-codex:medium:none",
         },
       }),
     );
@@ -147,7 +147,7 @@ EMPTY=
         listenAddr: "127.0.0.1:8321",
         upstreamBaseUrl: "http://localhost:8317/v1/",
         upstreamApiKey: "upstream-key",
-        switches: "/msm=gpt-5.5:medium:fast",
+        switches: "/medium=gpt-5.5:medium:fast",
       },
       async () => ({
         exists: true,
@@ -157,7 +157,7 @@ EMPTY=
           QMS_UPSTREAM_BASE_URL: "http://localhost:8317/v1",
           QMS_UPSTREAM_API_KEY: "upstream-key",
           QMS_VIRTUAL_MODEL: "codex-quick-model-switch",
-          QMS_SWITCHES: "/msm=gpt-5.5:medium:fast",
+          QMS_SWITCHES: "/medium=gpt-5.5:medium:fast",
         },
       }),
     );

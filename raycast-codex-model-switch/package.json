@@ -62,7 +62,7 @@
       "description": "Comma-separated shortcuts in /shortcut=model:effort:service_tier format.",
       "type": "textfield",
       "required": true,
-      "default": "/msl=gpt-5.3-codex:medium:none,/msm=gpt-5.5:medium:fast,/msh=gpt-5.5:high:standard,/msxh=gpt-5.5:xhigh:standard"
+      "default": "/light=gpt-5.3-codex:medium:none,/medium=gpt-5.5:medium:fast,/high=gpt-5.5:high:standard,/extra-high=gpt-5.5:xhigh:standard"
     },
     {
       "name": "listenAddr",

@@ -38,7 +38,7 @@ describe("router client", () => {
       text: async () => "",
     }));
 
-    await switchModel("http://127.0.0.1:8321", "router-key", "/msm", fetchImpl);
+    await switchModel("http://127.0.0.1:8321", "router-key", "/medium", fetchImpl);
 
     expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:8321/switch", {
       method: "POST",
@@ -46,7 +46,7 @@ describe("router client", () => {
         Authorization: "Bearer router-key",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ shortcut: "/msm" }),
+      body: JSON.stringify({ shortcut: "/medium" }),
     });
   });
 });

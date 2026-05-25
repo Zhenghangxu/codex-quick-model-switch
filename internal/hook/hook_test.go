@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandleNoMatchProducesNoOutput(t *testing.T) {
-	cfg := config.Config{Switches: map[string]config.Switch{"/msl": {Shortcut: "/msl"}}}
+	cfg := config.Config{Switches: map[string]config.Switch{"/light": {Shortcut: "/light"}}}
 	result, err := Handle([]byte(`{"prompt":"hello"}`), cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("Handle returned error: %v", err)
@@ -45,16 +45,16 @@ func TestHandleExactShortcutCallsRouterAndBlocksPrompt(t *testing.T) {
 	cfg := config.Config{
 		RouterBaseURL: router.URL,
 		RouterAPIKey:  "router-key",
-		Switches:      map[string]config.Switch{"/msh": {Shortcut: "/msh", Model: "gpt-5.5", Effort: "high"}},
+		Switches:      map[string]config.Switch{"/high": {Shortcut: "/high", Model: "gpt-5.5", Effort: "high"}},
 	}
-	result, err := Handle([]byte(`{"prompt":" /msh "}`), cfg, http.DefaultClient, func(title, body string) error {
+	result, err := Handle([]byte(`{"prompt":" /high "}`), cfg, http.DefaultClient, func(title, body string) error {
 		notified = title + " " + body
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("Handle returned error: %v", err)
 	}
-	if gotShortcut != "/msh" {
+	if gotShortcut != "/high" {
 		t.Fatalf("router shortcut = %q", gotShortcut)
 	}
 	if !result.Handled {
@@ -76,9 +76,9 @@ func TestHandleRouterFailureStillBlocksShortcut(t *testing.T) {
 
 	cfg := config.Config{
 		RouterBaseURL: router.URL,
-		Switches:      map[string]config.Switch{"/msl": {Shortcut: "/msl", Model: "gpt-5.3-codex", Effort: "medium"}},
+		Switches:      map[string]config.Switch{"/light": {Shortcut: "/light", Model: "gpt-5.3-codex", Effort: "medium"}},
 	}
-	result, err := Handle([]byte(`{"prompt":"/msl"}`), cfg, http.DefaultClient, nil)
+	result, err := Handle([]byte(`{"prompt":"/light"}`), cfg, http.DefaultClient, nil)
 	if err == nil {
 		t.Fatal("expected router failure")
 	}

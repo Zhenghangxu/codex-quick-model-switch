@@ -1,6 +1,6 @@
 # Codex Quick Model Switch
 
-`codex-quick-model-switch` is a small local router for Codex that lets you switch the model, reasoning effort, and service tier from Raycast using configured switches such as `/msl`, `/msm`, `/msh`, or `/msxh`.
+`codex-quick-model-switch` is a small local router for Codex that lets you switch the model, reasoning effort, and service tier from Raycast using configured switches such as `/light`, `/medium`, `/high`, or `/extra-high`.
 
 It is designed for manual switching only. There is no classifier, no prompt extraction, no automatic routing, and no Groq dependency.
 
@@ -100,10 +100,10 @@ Everything else, including prompt input, tools, metadata, and unrelated fields, 
 
 | Switch | Model | Reasoning effort | Service tier |
 | --- | --- | --- | --- |
-| `/msl` | `gpt-5.3-codex` | `medium` | none |
-| `/msm` | `gpt-5.5` | `medium` | `fast` |
-| `/msh` | `gpt-5.5` | `high` | standard/default |
-| `/msxh` | `gpt-5.5` | `xhigh` | standard/default |
+| `/light` | `gpt-5.3-codex` | `medium` | none |
+| `/medium` | `gpt-5.5` | `medium` | `fast` |
+| `/high` | `gpt-5.5` | `high` | standard/default |
+| `/extra-high` | `gpt-5.5` | `xhigh` | standard/default |
 
 Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, and `standard` sends the upstream-compatible default value currently used by this tool.
 
@@ -184,11 +184,11 @@ cd /path/to/codex-quick-model-switch
 
 ROUTER_KEY="$(awk -F= '$1=="QMS_ROUTER_API_KEY"{print $2; exit}' ~/.codex-quick-model-switch.env)"
 curl -fsS -H "Authorization: Bearer $ROUTER_KEY" http://127.0.0.1:8321/switches
-curl -fsS -X POST -H "Authorization: Bearer $ROUTER_KEY" -H "Content-Type: application/json" -d '{"shortcut":"/msm"}' http://127.0.0.1:8321/switch
+curl -fsS -X POST -H "Authorization: Bearer $ROUTER_KEY" -H "Content-Type: application/json" -d '{"shortcut":"/medium"}' http://127.0.0.1:8321/switch
 curl -fsS -H "Authorization: Bearer $ROUTER_KEY" http://127.0.0.1:8321/state
 ```
 
-For UI validation, launch Raycast with `Command+Space`, run `Codex Model Switch Status`, then run `Switch Codex Model` and choose `/msm` or another configured model.
+For UI validation, launch Raycast with `Command+Space`, run `Codex Model Switch Status`, then run `Switch Codex Model` and choose `/medium` or another configured model.
 
 ## Cleanup
 
@@ -279,10 +279,10 @@ Restart Codex after changing config so it reloads `config.toml`.
 Once the router is running and Codex has reloaded config:
 
 1. Run `Switch Codex Model` from Raycast.
-2. Choose one of the configured switches, such as `/msm`.
+2. Choose one of the configured switches, such as `/medium`.
 3. Send your next normal prompt in Codex. It will use the selected model settings.
 
-For example, choosing `/msl` selects `gpt-5.3-codex` with medium reasoning and no service tier. Choosing `/msh` selects `gpt-5.5` with high reasoning and the standard/default service tier.
+For example, choosing `/light` selects `gpt-5.3-codex` with medium reasoning and no service tier. Choosing `/high` selects `gpt-5.5` with high reasoning and the standard/default service tier.
 
 ## Configuration
 

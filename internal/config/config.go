@@ -14,7 +14,7 @@ const (
 	DefaultListenAddr      = "127.0.0.1:8321"
 	DefaultUpstreamBaseURL = "http://localhost:8317/v1"
 	DefaultVirtualModel    = "codex-quick-model-switch"
-	DefaultSwitches        = "/msl=gpt-5.3-codex:medium:none,/msm=gpt-5.5:medium:fast,/msh=gpt-5.5:high:standard,/msxh=gpt-5.5:xhigh:standard"
+	DefaultSwitches        = "/light=gpt-5.3-codex:medium:none,/medium=gpt-5.5:medium:fast,/high=gpt-5.5:high:standard,/extra-high=gpt-5.5:xhigh:standard"
 
 	ServiceTierNone     = "none"
 	ServiceTierFast     = "fast"

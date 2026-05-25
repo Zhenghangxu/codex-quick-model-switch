@@ -7,7 +7,7 @@ const testOptions = {
   listenAddr: "127.0.0.1:8321",
   upstreamBaseUrl: "http://localhost:8317/v1",
   upstreamApiKey: "upstream-key",
-  switches: "/msm=gpt-5.5:medium:fast",
+  switches: "/medium=gpt-5.5:medium:fast",
 };
 
 describe("service orchestration", () => {

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { PreferencesLike } from "./types";
+import { normalizeSwitches } from "./switchDefaults";
 
 const ENV_ORDER = [
   "QMS_LISTEN_ADDR",
@@ -83,7 +84,7 @@ export function toEnvValues(
     QMS_UPSTREAM_BASE_URL: preferences.upstreamBaseUrl.trim().replace(/\/+$/, ""),
     QMS_UPSTREAM_API_KEY: upstreamKey,
     QMS_VIRTUAL_MODEL: VIRTUAL_MODEL,
-    QMS_SWITCHES: preferences.switches.trim(),
+    QMS_SWITCHES: normalizeSwitches(preferences.switches),
   };
   return values;
 }
@@ -135,7 +136,7 @@ function compareGeneratedEnv(values: Record<string, string>, preferences: Prefer
     QMS_UPSTREAM_BASE_URL: preferences.upstreamBaseUrl.trim().replace(/\/+$/, ""),
     QMS_UPSTREAM_API_KEY: preferences.upstreamApiKey?.trim() ?? "",
     QMS_VIRTUAL_MODEL: VIRTUAL_MODEL,
-    QMS_SWITCHES: preferences.switches.trim(),
+    QMS_SWITCHES: normalizeSwitches(preferences.switches),
   };
   const labels: Record<keyof typeof expected, string> = {
     QMS_LISTEN_ADDR: "Raycast Router Listen Address",

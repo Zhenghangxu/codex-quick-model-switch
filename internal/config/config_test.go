@@ -12,10 +12,10 @@ func TestParseDefaultSwitches(t *testing.T) {
 	}
 
 	cases := map[string]Switch{
-		"/msl":  {Shortcut: "/msl", Model: "gpt-5.3-codex", Effort: "medium", ServiceTier: ServiceTierNone},
-		"/msm":  {Shortcut: "/msm", Model: "gpt-5.5", Effort: "medium", ServiceTier: ServiceTierFast},
-		"/msh":  {Shortcut: "/msh", Model: "gpt-5.5", Effort: "high", ServiceTier: ServiceTierStandard},
-		"/msxh": {Shortcut: "/msxh", Model: "gpt-5.5", Effort: "xhigh", ServiceTier: ServiceTierStandard},
+		"/light":      {Shortcut: "/light", Model: "gpt-5.3-codex", Effort: "medium", ServiceTier: ServiceTierNone},
+		"/medium":     {Shortcut: "/medium", Model: "gpt-5.5", Effort: "medium", ServiceTier: ServiceTierFast},
+		"/high":       {Shortcut: "/high", Model: "gpt-5.5", Effort: "high", ServiceTier: ServiceTierStandard},
+		"/extra-high": {Shortcut: "/extra-high", Model: "gpt-5.5", Effort: "xhigh", ServiceTier: ServiceTierStandard},
 	}
 
 	if len(got) != len(cases) {
@@ -50,7 +50,7 @@ func TestLoadPreservesSwitchOrder(t *testing.T) {
 }
 
 func TestParseSwitchesRejectsInvalidShortcut(t *testing.T) {
-	_, err := ParseSwitches("msl=gpt-5.3-codex:medium:none")
+	_, err := ParseSwitches("light=gpt-5.3-codex:medium:none")
 	if err == nil {
 		t.Fatal("expected invalid shortcut error")
 	}
@@ -94,8 +94,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.StatePath != "/Users/example/Library/Application Support/codex-quick-model-switch/state.json" {
 		t.Fatalf("StatePath = %q", cfg.StatePath)
 	}
-	if cfg.Switches["/msl"].Model != "gpt-5.3-codex" {
-		t.Fatalf("/msl model = %q", cfg.Switches["/msl"].Model)
+	if cfg.Switches["/light"].Model != "gpt-5.3-codex" {
+		t.Fatalf("/light model = %q", cfg.Switches["/light"].Model)
 	}
 }
 

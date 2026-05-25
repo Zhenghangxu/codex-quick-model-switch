@@ -9,7 +9,7 @@ import (
 func TestStoreSwitchPersistsActiveSwitch(t *testing.T) {
 	path := t.TempDir() + "/state.json"
 	store := NewStore(path)
-	sw := config.Switch{Shortcut: "/msh", Model: "gpt-5.5", Effort: "high", ServiceTier: config.ServiceTierStandard}
+	sw := config.Switch{Shortcut: "/high", Model: "gpt-5.5", Effort: "high", ServiceTier: config.ServiceTierStandard}
 
 	if err := store.Save(ActiveState{Active: sw}); err != nil {
 		t.Fatalf("Save returned error: %v", err)

@@ -15,12 +15,12 @@ import (
 func TestSwitchAndStateEndpoints(t *testing.T) {
 	cfg := config.Config{
 		Switches: map[string]config.Switch{
-			"/msl": {Shortcut: "/msl", Model: "gpt-5.3-codex", Effort: "medium", ServiceTier: config.ServiceTierNone},
+			"/light": {Shortcut: "/light", Model: "gpt-5.3-codex", Effort: "medium", ServiceTier: config.ServiceTierNone},
 		},
 	}
 	handler := New(cfg, state.NewStore(t.TempDir()+"/state.json"), nil)
 
-	req := httptest.NewRequest(http.MethodPost, "/switch", strings.NewReader(`{"shortcut":"/msl"}`))
+	req := httptest.NewRequest(http.MethodPost, "/switch", strings.NewReader(`{"shortcut":"/light"}`))
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
@@ -106,11 +106,11 @@ func TestProxyPatchesVirtualModelAndForwardsExplicitModelUnchanged(t *testing.T)
 		UpstreamAPIKey:  "upstream-key",
 		VirtualModel:    "codex-quick-model-switch",
 		Switches: map[string]config.Switch{
-			"/msm": {Shortcut: "/msm", Model: "gpt-5.5", Effort: "medium", ServiceTier: config.ServiceTierFast},
+			"/medium": {Shortcut: "/medium", Model: "gpt-5.5", Effort: "medium", ServiceTier: config.ServiceTierFast},
 		},
 	}
 	store := state.NewStore(t.TempDir() + "/state.json")
-	if err := store.Save(state.ActiveState{Active: cfg.Switches["/msm"]}); err != nil {
+	if err := store.Save(state.ActiveState{Active: cfg.Switches["/medium"]}); err != nil {
 		t.Fatalf("save state: %v", err)
 	}
 	handler := New(cfg, store, http.DefaultClient)
