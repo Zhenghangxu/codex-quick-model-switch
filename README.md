@@ -6,6 +6,9 @@ This project is only for Codex setups that use an API key through an OpenAI-comp
 
 It is designed for manual switching only. There is no automatic routing.
 
+<img width="1511" height="952" alt="image" src="https://github.com/user-attachments/assets/57e26c2c-ee5e-4dfb-a441-8792cee3cb47" />
+
+
 ## Quick Start
 
 These steps assume the repo is already cloned, but no Raycast preferences, router env file, LaunchAgent, or Codex provider config exists yet.
