@@ -9,7 +9,7 @@ It is designed for manual switching only. There is no classifier, no prompt extr
 The recommended UI is the bundled Raycast extension in:
 
 ```text
-/Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+/path/to/codex-quick-model-switch/raycast-codex-model-switch
 ```
 
 Raycast is responsible for:
@@ -69,29 +69,29 @@ Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, 
 Build the router binary:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+cd /path/to/codex-quick-model-switch
 make build
 ```
 
 Install the Raycast extension in development mode:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+cd /path/to/codex-quick-model-switch/raycast-codex-model-switch
 npm install
 npm run dev
 ```
 
-Open Raycast with `Command+Space`, search for `Start LLM Server`, and open the extension preferences when Raycast prompts for them.
+Open Raycast with `Command+Space`, search for `Toggle LLM Server`, and open the extension preferences when Raycast prompts for them.
 
 Set:
 
 - `Upstream Base URL`: your OpenAI-compatible upstream endpoint, for example `http://localhost:8317/v1`
 - `Upstream API Key`: required bearer token for that upstream endpoint
-- `Router Binary`: `/Users/jasonxu/Documents/personal/codex-quick-model-switch/bin/codex-quick-model-switch`
+- `Router Binary`: `/path/to/codex-quick-model-switch/bin/codex-quick-model-switch`
 - `Model Switches`: comma-separated `/shortcut=model:effort:service_tier` mappings
 - `Router Listen Address`: `127.0.0.1:8321`
 
-Run `Start LLM Server` from Raycast. It writes `~/.codex-quick-model-switch.env`, preserves or generates `QMS_ROUTER_API_KEY`, installs the LaunchAgent, starts it, and runs `doctor`.
+Run `Toggle LLM Server` from Raycast. When the LaunchAgent is stopped, it writes `~/.codex-quick-model-switch.env`, preserves or generates `QMS_ROUTER_API_KEY`, installs the LaunchAgent, starts it, and runs `doctor`. When the LaunchAgent is already running, it stops it.
 
 Then run `Switch Codex Model` from Raycast and choose the active model. `Codex Model Switch Status` shows the LaunchAgent state, router health, active model, env path, and binary path.
 
@@ -114,7 +114,7 @@ requires_openai_auth = true
 
 [model_providers."codex-quick-model-switch".auth]
 command = "/usr/bin/awk"
-args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/jasonxu/.codex-quick-model-switch.env"]
+args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/you/.codex-quick-model-switch.env"]
 timeout_ms = 5000
 refresh_interval_ms = 300000
 ```
@@ -130,11 +130,11 @@ Restart Codex after changing `config.toml`.
 Run the automated checks:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+cd /path/to/codex-quick-model-switch
 go test ./...
 make build
 
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+cd /path/to/codex-quick-model-switch/raycast-codex-model-switch
 npm test
 npm run build
 npm run lint
@@ -143,7 +143,7 @@ npm run lint
 Run live checks:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+cd /path/to/codex-quick-model-switch
 ./bin/codex-quick-model-switch service status
 ./bin/codex-quick-model-switch doctor
 
@@ -160,7 +160,7 @@ For UI validation, launch Raycast with `Command+Space`, run `Codex Model Switch 
 Stop and remove the LaunchAgent:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+cd /path/to/codex-quick-model-switch
 ./bin/codex-quick-model-switch service stop
 ./bin/codex-quick-model-switch service uninstall
 ```
@@ -179,7 +179,7 @@ To stop using the router from Codex, edit `~/.codex/config.toml` and set `model`
 If you no longer want the old Codex slash-command hook, edit `~/.codex/hooks.json` and remove the `UserPromptSubmit` hook command containing:
 
 ```text
-codex-quick-model-switch hook --env /Users/jasonxu/.codex-quick-model-switch.env
+codex-quick-model-switch hook --env /Users/you/.codex-quick-model-switch.env
 ```
 
 Keep the `PostToolUse`, `PreToolUse`, `SessionStart`, `Stop`, or unrelated hook entries intact.
@@ -191,7 +191,7 @@ The Raycast workflow above is preferred. The CLI installer remains useful if you
 Build the binary first:
 
 ```bash
-cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+cd /path/to/codex-quick-model-switch
 make build
 ```
 
@@ -255,7 +255,7 @@ Codex also needs the same value when it sends requests to the local provider. Pr
 ```toml
 [model_providers."codex-quick-model-switch".auth]
 command = "/usr/bin/awk"
-args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/jasonxu/.codex-quick-model-switch.env"]
+args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/you/.codex-quick-model-switch.env"]
 timeout_ms = 5000
 refresh_interval_ms = 300000
 ```

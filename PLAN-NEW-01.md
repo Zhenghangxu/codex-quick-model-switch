@@ -1,7 +1,7 @@
 # Codex Quick Model Switch Plan
 
 ## Summary
-Build a small Go tool in `/Users/jasonxu/Documents/personal/codex-quick-model-switch` that uses the official Codex `UserPromptSubmit` hook contract from [OpenAI Codex hooks](https://developers.openai.com/codex/hooks). The hook detects configured switch shortcuts such as `/msl`, `/msm`, `/msh`, and `/msxh`, calls a local router, sends a quiet macOS notification, and returns `{"decision":"block"}` so the switch command never reaches the model.
+Build a small Go tool in `/path/to/codex-quick-model-switch` that uses the official Codex `UserPromptSubmit` hook contract from [OpenAI Codex hooks](https://developers.openai.com/codex/hooks). The hook detects configured switch shortcuts such as `/msl`, `/msm`, `/msh`, and `/msxh`, calls a local router, sends a quiet macOS notification, and returns `{"decision":"block"}` so the switch command never reaches the model.
 
 The router will use a minimum-impact request patching strategy: no prompt extraction, no classifier, no full request rebuild. It will surgically modify only the model name, thinking effort, and service tier for virtual-model requests, preserving all prompt, tools, metadata, cache keys, and request ordering as much as possible for maximum prompt-cache stability.
 

@@ -2,7 +2,7 @@ import { Action, ActionPanel, Detail, Icon, openExtensionPreferences, showToast,
 import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_ENV_PATH, readEnvValues } from "./lib/env";
 import { getSwitches, healthz, routerBaseUrl } from "./lib/router";
-import { serviceStatus, startServer, stopServer } from "./lib/service";
+import { serviceStatus, toggleServer } from "./lib/service";
 import { preferences } from "./preferences";
 
 type StatusState =
@@ -87,35 +87,18 @@ function StatusActions(props: { onRefresh: () => Promise<void> }) {
   return (
     <ActionPanel>
       <Action
-        title="Start LLM Server"
-        icon={Icon.Play}
+        title="Toggle LLM Server"
+        icon={Icon.Power}
         onAction={async () => {
-          const toast = await showToast({ style: Toast.Style.Animated, title: "Starting Codex model router" });
+          const toast = await showToast({ style: Toast.Style.Animated, title: "Toggling Codex model router" });
           try {
-            await startServer(prefs);
-            toast.style = Toast.Style.Success;
-            toast.title = "Router running";
+            const result = await toggleServer(prefs);
+            toast.style = result.action === "started" ? Toast.Style.Success : Toast.Style.Failure;
+            toast.title = result.action === "started" ? "Router running" : "Router stopped";
             await props.onRefresh();
           } catch (error) {
             toast.style = Toast.Style.Failure;
-            toast.title = "Start failed";
-            toast.message = error instanceof Error ? error.message : String(error);
-          }
-        }}
-      />
-      <Action
-        title="Stop LLM Server"
-        icon={Icon.Stop}
-        onAction={async () => {
-          const toast = await showToast({ style: Toast.Style.Animated, title: "Stopping Codex model router" });
-          try {
-            await stopServer(prefs.binaryPath);
-            toast.style = Toast.Style.Success;
-            toast.title = "Router stopped";
-            await props.onRefresh();
-          } catch (error) {
-            toast.style = Toast.Style.Failure;
-            toast.title = "Stop failed";
+            toast.title = "Toggle failed";
             toast.message = error instanceof Error ? error.message : String(error);
           }
         }}

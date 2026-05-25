@@ -13,6 +13,7 @@ export type StartOptions = PreferencesLike & {
 export type ServiceDeps = {
   writeEnv?: (envPath: string, preferences: PreferencesLike) => Promise<string>;
   runBinary?: (binaryPath: string, args: string[]) => Promise<CommandResult>;
+  wait?: (ms: number) => Promise<void>;
 };
 
 export async function startServer(options: StartOptions, deps: ServiceDeps = {}): Promise<{ routerKey: string }> {
@@ -25,8 +26,23 @@ export async function startServer(options: StartOptions, deps: ServiceDeps = {})
   if (!(await isServiceRunning(options.binaryPath, runBinary))) {
     await runBinary(options.binaryPath, ["service", "start"]);
   }
-  await runBinary(options.binaryPath, ["doctor"]);
+  await doctorWithRetry(options.binaryPath, runBinary, deps.wait ?? wait);
   return { routerKey };
+}
+
+export async function toggleServer(
+  options: StartOptions,
+  deps: ServiceDeps = {},
+): Promise<{ action: "started" | "stopped" }> {
+  const runBinary = deps.runBinary ?? runBinaryCommand;
+
+  if (await isServiceRunning(options.binaryPath, runBinary)) {
+    await stopServer(options.binaryPath, runBinary);
+    return { action: "stopped" };
+  }
+
+  await startServer(options, deps);
+  return { action: "started" };
 }
 
 export async function stopServer(binaryPath: string, runBinary = runBinaryCommand): Promise<void> {
@@ -35,6 +51,29 @@ export async function stopServer(binaryPath: string, runBinary = runBinaryComman
 
 export async function serviceStatus(binaryPath: string, runBinary = runBinaryCommand): Promise<CommandResult> {
   return runBinary(binaryPath, ["service", "status"]);
+}
+
+async function doctorWithRetry(
+  binaryPath: string,
+  runBinary: (binaryPath: string, args: string[]) => Promise<CommandResult>,
+  waitFor: (ms: number) => Promise<void>,
+): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    try {
+      await runBinary(binaryPath, ["doctor"]);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 20) {
+        throw error;
+      }
+      await waitFor(250);
+    }
+  }
+
+  throw lastError;
 }
 
 async function isServiceRunning(
@@ -47,6 +86,10 @@ async function isServiceRunning(
   } catch {
     return false;
   }
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function runBinaryCommand(binaryPath: string, args: string[]): Promise<CommandResult> {

@@ -1,6 +1,6 @@
 基于codex hook的快速模型转换
 
-仿照 `/Users/jasonxu/Documents/personal/complexity-router` 设置router，但是去掉groq和任何自动switch的代码
+仿照一个本地 router 项目设置 router，但是去掉 groq 和任何自动 switch 的代码
 
 注意!!!
 

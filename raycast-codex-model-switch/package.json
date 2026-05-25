@@ -3,7 +3,7 @@
   "title": "Codex Model Switch",
   "description": "Configure and switch the Codex quick model switch router from Raycast.",
   "icon": "icon.png",
-  "author": "thomas",
+  "author": "codex-quick-model-switch contributors",
   "license": "MIT",
   "platforms": [
     "macOS"
@@ -15,8 +15,8 @@
   "commands": [
     {
       "name": "start-llm-server",
-      "title": "Start LLM Server",
-      "description": "Configure and start the Codex model switch router.",
+      "title": "Toggle LLM Server",
+      "description": "Configure, start, or stop the Codex model switch router.",
       "mode": "no-view"
     },
     {
@@ -54,7 +54,7 @@
       "description": "Path to the built codex-quick-model-switch binary.",
       "type": "file",
       "required": true,
-      "default": "/Users/jasonxu/Documents/personal/codex-quick-model-switch/bin/codex-quick-model-switch"
+      "default": "/usr/local/bin/codex-quick-model-switch"
     },
     {
       "name": "switches",

@@ -36,7 +36,7 @@ export default function Command() {
   if (state.status === "error") {
     return (
       <Detail
-        markdown={`# Router unavailable\n\n${state.message}\n\nRun **Start LLM Server** first, then try again.`}
+        markdown={`# Router unavailable\n\n${state.message}\n\nRun **Toggle LLM Server** first, then try again.`}
         actions={
           <ActionPanel>
             <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
