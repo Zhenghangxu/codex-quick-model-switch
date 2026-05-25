@@ -27,14 +27,13 @@ These steps assume the repo is already cloned, but no Raycast preferences, route
 
 4. Run `Toggle LLM Server` again. When the router is stopped, Raycast writes `~/.codex-quick-model-switch.env`, preserves or generates `QMS_ROUTER_API_KEY`, installs and starts the LaunchAgent, and runs `doctor`.
 
-5. Make the generated router key visible to Codex:
+5. Copy the generated `QMS_ROUTER_API_KEY` from `~/.codex-quick-model-switch.env` into `~/.zshrc`:
 
    ```bash
-   export QMS_ROUTER_API_KEY="$(awk -F= '$1=="QMS_ROUTER_API_KEY"{print $2; exit}' ~/.codex-quick-model-switch.env)"
-   launchctl setenv QMS_ROUTER_API_KEY "$QMS_ROUTER_API_KEY"
+   export QMS_ROUTER_API_KEY="paste-generated-router-key-here"
    ```
 
-6. Add this provider to `~/.codex/config.toml`:
+6. Restart Codex, then add this provider to `~/.codex/config.toml`:
 
    ```toml
    model = "codex-quick-model-switch"
@@ -50,7 +49,7 @@ These steps assume the repo is already cloned, but no Raycast preferences, route
 
    Do not add a nested `[model_providers."codex-quick-model-switch".auth]` command block for this provider.
 
-7. Restart Codex, then run `Switch Codex Model` from Raycast and choose a model.
+7. Run `Switch Codex Model` from Raycast and choose a model.
 
 Quick validation:
 
