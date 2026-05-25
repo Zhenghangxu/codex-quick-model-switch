@@ -10,6 +10,13 @@ import (
 
 const label = "com.jasonxu.codex-quick-model-switch"
 
+const (
+	launchctlPath = "/bin/launchctl"
+	idPath        = "/usr/bin/id"
+)
+
+var launchctl = runLaunchctl
+
 func Install(binaryPath, envPath string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -48,6 +55,9 @@ func Start() error {
 	} else if err != nil {
 		return err
 	}
+	if err := Status(); err == nil {
+		return nil
+	}
 	return launchctl("bootstrap", "gui/"+uid(), plistPath())
 }
 
@@ -70,11 +80,11 @@ func plistPath() string {
 }
 
 func uid() string {
-	return strings.TrimSpace(run("id", "-u"))
+	return strings.TrimSpace(run(idPath, "-u"))
 }
 
-func launchctl(args ...string) error {
-	cmd := exec.Command("launchctl", args...)
+func runLaunchctl(args ...string) error {
+	cmd := exec.Command(launchctlPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

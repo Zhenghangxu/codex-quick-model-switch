@@ -72,15 +72,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		cfg, err := config.Load("")
-		if err != nil {
-			return err
-		}
-		envPath := filepath.Join(mustHome(), ".codex-quick-model-switch.env")
+		envPath := defaultEnvPath()
 		if _, err := os.Stat(envPath); os.IsNotExist(err) {
 			if err := writeDefaultEnv(envPath); err != nil {
 				return err
 			}
+		}
+		cfg, err := config.Load(envPath)
+		if err != nil {
+			return err
 		}
 		return install.Install(install.Options{
 			BinaryPath:     binaryPath,
@@ -92,7 +92,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			Output:         stdout,
 		})
 	case "doctor":
-		cfg, err := config.Load("")
+		cfg, err := config.Load(defaultEnvPath())
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func runService(args []string) error {
 		if err != nil {
 			return err
 		}
-		envPath := filepath.Join(mustHome(), ".codex-quick-model-switch.env")
+		envPath := defaultEnvPath()
 		if _, err := os.Stat(envPath); os.IsNotExist(err) {
 			if err := writeDefaultEnv(envPath); err != nil {
 				return err
@@ -148,8 +148,16 @@ func writeDefaultEnv(path string) error {
 	if err != nil {
 		return err
 	}
-	text := fmt.Sprintf("QMS_LISTEN_ADDR=%s\nQMS_ROUTER_API_KEY=%s\nQMS_UPSTREAM_BASE_URL=%s\nQMS_VIRTUAL_MODEL=%s\nQMS_SWITCHES=%s\n", config.DefaultListenAddr, key, config.DefaultUpstreamBaseURL, config.DefaultVirtualModel, config.DefaultSwitches)
+	upstreamAPIKey := os.Getenv("QMS_UPSTREAM_API_KEY")
+	if upstreamAPIKey == "" {
+		return fmt.Errorf("QMS_UPSTREAM_API_KEY is required")
+	}
+	text := fmt.Sprintf("QMS_LISTEN_ADDR=%s\nQMS_ROUTER_API_KEY=%s\nQMS_UPSTREAM_BASE_URL=%s\nQMS_UPSTREAM_API_KEY=%s\nQMS_VIRTUAL_MODEL=%s\nQMS_SWITCHES=%s\n", config.DefaultListenAddr, key, config.DefaultUpstreamBaseURL, upstreamAPIKey, config.DefaultVirtualModel, config.DefaultSwitches)
 	return os.WriteFile(path, []byte(text), 0o600)
+}
+
+func defaultEnvPath() string {
+	return filepath.Join(mustHome(), ".codex-quick-model-switch.env")
 }
 
 func generateKey() (string, error) {

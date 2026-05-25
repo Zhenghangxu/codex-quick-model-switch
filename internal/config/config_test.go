@@ -28,6 +28,27 @@ func TestParseDefaultSwitches(t *testing.T) {
 	}
 }
 
+func TestLoadPreservesSwitchOrder(t *testing.T) {
+	t.Setenv("HOME", "/Users/example")
+	t.Setenv("QMS_SWITCHES", "/mini=gpt-5.4-mini:low:fast,/deep=gpt-5.5:xhigh:standard")
+	t.Setenv("QMS_UPSTREAM_API_KEY", "upstream-key")
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if len(cfg.SwitchOrder) != 2 {
+		t.Fatalf("SwitchOrder length = %d, want 2", len(cfg.SwitchOrder))
+	}
+	if cfg.SwitchOrder[0].Shortcut != "/mini" || cfg.SwitchOrder[1].Shortcut != "/deep" {
+		t.Fatalf("SwitchOrder = %#v", cfg.SwitchOrder)
+	}
+	if cfg.Switches["/deep"].Effort != "xhigh" {
+		t.Fatalf("/deep effort = %q", cfg.Switches["/deep"].Effort)
+	}
+}
+
 func TestParseSwitchesRejectsInvalidShortcut(t *testing.T) {
 	_, err := ParseSwitches("msl=gpt-5.3-codex:medium:none")
 	if err == nil {
@@ -49,6 +70,7 @@ func TestLoadDefaults(t *testing.T) {
 	} {
 		t.Setenv(key, "")
 	}
+	t.Setenv("QMS_UPSTREAM_API_KEY", "upstream-key")
 	cfg, err := Load("")
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
@@ -66,11 +88,26 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.RouterAPIKey != "" {
 		t.Fatalf("RouterAPIKey = %q, want empty default", cfg.RouterAPIKey)
 	}
+	if cfg.UpstreamAPIKey != "upstream-key" {
+		t.Fatalf("UpstreamAPIKey = %q, want configured key", cfg.UpstreamAPIKey)
+	}
 	if cfg.StatePath != "/Users/example/Library/Application Support/codex-quick-model-switch/state.json" {
 		t.Fatalf("StatePath = %q", cfg.StatePath)
 	}
 	if cfg.Switches["/msl"].Model != "gpt-5.3-codex" {
 		t.Fatalf("/msl model = %q", cfg.Switches["/msl"].Model)
+	}
+}
+
+func TestLoadRequiresUpstreamAPIKey(t *testing.T) {
+	t.Setenv("QMS_UPSTREAM_API_KEY", "")
+
+	_, err := Load("")
+	if err == nil {
+		t.Fatal("expected missing upstream api key error")
+	}
+	if err.Error() != "QMS_UPSTREAM_API_KEY is required" {
+		t.Fatalf("Load error = %q", err.Error())
 	}
 }
 

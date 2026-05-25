@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"codex-quick-model-switch/internal/config"
@@ -32,6 +33,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/healthz":
 		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodGet && r.URL.Path == "/switches":
+		if !h.authorized(w, r) {
+			return
+		}
+		h.handleSwitches(w)
 	case r.Method == http.MethodGet && r.URL.Path == "/state":
 		if !h.authorized(w, r) {
 			return
@@ -50,6 +56,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *Handler) handleSwitches(w http.ResponseWriter) {
+	st, err := h.store.Load()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	switches := h.cfg.SwitchOrder
+	if len(switches) == 0 {
+		for _, sw := range h.cfg.Switches {
+			switches = append(switches, sw)
+		}
+		sort.Slice(switches, func(i, j int) bool {
+			return switches[i].Shortcut < switches[j].Shortcut
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"switches": switches,
+		"active":   st.Active,
+	})
 }
 
 func (h *Handler) authorized(w http.ResponseWriter, r *http.Request) bool {

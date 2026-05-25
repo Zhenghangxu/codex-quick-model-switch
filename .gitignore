@@ -1,1 +1,4 @@
 bin/
+raycast-codex-model-switch/dist/
+raycast-codex-model-switch/node_modules/
+raycast-codex-model-switch/raycast-env.d.ts

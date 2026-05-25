@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node", "react"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["tests/**/*"]
+}

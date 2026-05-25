@@ -37,6 +37,7 @@ type Config struct {
 	VirtualModel    string
 	StatePath       string
 	Switches        map[string]Switch
+	SwitchOrder     []Switch
 }
 
 func Load(envPath string) (Config, error) {
@@ -50,9 +51,13 @@ func Load(envPath string) (Config, error) {
 	}
 
 	listenAddr := get("QMS_LISTEN_ADDR", DefaultListenAddr, env)
-	switches, err := ParseSwitches(get("QMS_SWITCHES", DefaultSwitches, env))
+	switchOrder, switches, err := ParseSwitchList(get("QMS_SWITCHES", DefaultSwitches, env))
 	if err != nil {
 		return Config{}, err
+	}
+	upstreamAPIKey := get("QMS_UPSTREAM_API_KEY", "", env)
+	if upstreamAPIKey == "" {
+		return Config{}, fmt.Errorf("QMS_UPSTREAM_API_KEY is required")
 	}
 
 	cfg := Config{
@@ -60,16 +65,23 @@ func Load(envPath string) (Config, error) {
 		RouterBaseURL:   get("QMS_ROUTER_BASE_URL", routerBaseURL(listenAddr), env),
 		UpstreamBaseURL: strings.TrimRight(get("QMS_UPSTREAM_BASE_URL", DefaultUpstreamBaseURL, env), "/"),
 		RouterAPIKey:    get("QMS_ROUTER_API_KEY", "", env),
-		UpstreamAPIKey:  get("QMS_UPSTREAM_API_KEY", "", env),
+		UpstreamAPIKey:  upstreamAPIKey,
 		VirtualModel:    get("QMS_VIRTUAL_MODEL", DefaultVirtualModel, env),
 		StatePath:       expandHome(get("QMS_STATE_PATH", "~/Library/Application Support/codex-quick-model-switch/state.json", env)),
 		Switches:        switches,
+		SwitchOrder:     switchOrder,
 	}
 	return cfg, nil
 }
 
 func ParseSwitches(raw string) (map[string]Switch, error) {
+	_, switches, err := ParseSwitchList(raw)
+	return switches, err
+}
+
+func ParseSwitchList(raw string) ([]Switch, map[string]Switch, error) {
 	result := map[string]Switch{}
+	ordered := []Switch{}
 	for _, entry := range strings.Split(raw, ",") {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
@@ -77,16 +89,16 @@ func ParseSwitches(raw string) (map[string]Switch, error) {
 		}
 		left, right, ok := strings.Cut(entry, "=")
 		if !ok {
-			return nil, fmt.Errorf("switch %q must use shortcut=model:effort:tier", entry)
+			return nil, nil, fmt.Errorf("switch %q must use shortcut=model:effort:tier", entry)
 		}
 		shortcut := strings.TrimSpace(left)
 		if !strings.HasPrefix(shortcut, "/") || len(shortcut) < 2 || strings.ContainsAny(shortcut, " \t\r\n") {
-			return nil, fmt.Errorf("invalid shortcut %q", shortcut)
+			return nil, nil, fmt.Errorf("invalid shortcut %q", shortcut)
 		}
 
 		parts := strings.Split(right, ":")
 		if len(parts) != 3 {
-			return nil, fmt.Errorf("switch %q must define model:effort:tier", shortcut)
+			return nil, nil, fmt.Errorf("switch %q must define model:effort:tier", shortcut)
 		}
 		sw := Switch{
 			Shortcut:    shortcut,
@@ -95,20 +107,21 @@ func ParseSwitches(raw string) (map[string]Switch, error) {
 			ServiceTier: strings.TrimSpace(parts[2]),
 		}
 		if sw.Model == "" {
-			return nil, fmt.Errorf("switch %q has empty model", shortcut)
+			return nil, nil, fmt.Errorf("switch %q has empty model", shortcut)
 		}
 		if !validEffort(sw.Effort) {
-			return nil, fmt.Errorf("switch %q has invalid effort %q", shortcut, sw.Effort)
+			return nil, nil, fmt.Errorf("switch %q has invalid effort %q", shortcut, sw.Effort)
 		}
 		if !validTier(sw.ServiceTier) {
-			return nil, fmt.Errorf("switch %q has invalid service tier %q", shortcut, sw.ServiceTier)
+			return nil, nil, fmt.Errorf("switch %q has invalid service tier %q", shortcut, sw.ServiceTier)
 		}
 		result[shortcut] = sw
+		ordered = append(ordered, sw)
 	}
 	if len(result) == 0 {
-		return nil, fmt.Errorf("no switches configured")
+		return nil, nil, fmt.Errorf("no switches configured")
 	}
-	return result, nil
+	return ordered, result, nil
 }
 
 func readEnvFile(path string) (map[string]string, error) {

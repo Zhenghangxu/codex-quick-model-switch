@@ -4,12 +4,31 @@
 
 It is designed for manual switching only. There is no classifier, no prompt extraction, no automatic routing, and no Groq dependency.
 
+## Raycast Workflow
+
+The recommended UI is the bundled Raycast extension in:
+
+```text
+/Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+```
+
+Raycast is responsible for:
+
+- collecting the upstream LLM endpoint and required API key in Raycast preferences
+- writing `~/.codex-quick-model-switch.env`
+- installing and starting the macOS LaunchAgent
+- listing configured model switches
+- switching the active model without typing a prompt into Codex
+
+The Go router is still the Codex-facing proxy. Codex sends requests to `http://localhost:8321/v1`; Raycast only configures and controls the router.
+
 ## How It Works
 
-The tool has two moving parts:
+The tool has three moving parts:
 
-1. A Codex `UserPromptSubmit` hook watches each user prompt before it reaches the model.
-2. A local router listens on `127.0.0.1:8321` and proxies Codex model requests upstream.
+1. A local router listens on `127.0.0.1:8321` and proxies Codex model requests upstream.
+2. The Raycast extension configures the router and switches the active model through local HTTP endpoints.
+3. An optional Codex `UserPromptSubmit` hook can still watch prompt shortcuts before they reach the model.
 
 When you type a switch shortcut, for example:
 
@@ -45,7 +64,129 @@ Everything else, including prompt input, tools, metadata, and unrelated fields, 
 
 Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, and `standard` sends the upstream-compatible default value currently used by this tool.
 
-## Install
+## Install With Raycast
+
+Build the router binary:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+make build
+```
+
+Install the Raycast extension in development mode:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+npm install
+npm run dev
+```
+
+Open Raycast with `Command+Space`, search for `Start LLM Server`, and open the extension preferences when Raycast prompts for them.
+
+Set:
+
+- `Upstream Base URL`: your OpenAI-compatible upstream endpoint, for example `http://localhost:8317/v1`
+- `Upstream API Key`: required bearer token for that upstream endpoint
+- `Router Binary`: `/Users/jasonxu/Documents/personal/codex-quick-model-switch/bin/codex-quick-model-switch`
+- `Model Switches`: comma-separated `/shortcut=model:effort:service_tier` mappings
+- `Router Listen Address`: `127.0.0.1:8321`
+
+Run `Start LLM Server` from Raycast. It writes `~/.codex-quick-model-switch.env`, preserves or generates `QMS_ROUTER_API_KEY`, installs the LaunchAgent, starts it, and runs `doctor`.
+
+Then run `Switch Codex Model` from Raycast and choose the active model. `Codex Model Switch Status` shows the LaunchAgent state, router health, active model, env path, and binary path.
+
+## Configure Codex
+
+Codex must use the local router as a user-level model provider. Put this in `~/.codex/config.toml`:
+
+```toml
+model = "codex-quick-model-switch"
+model_provider = "codex-quick-model-switch"
+
+[features]
+hooks = true
+
+[model_providers."codex-quick-model-switch"]
+name = "codex-quick-model-switch"
+base_url = "http://localhost:8321/v1"
+wire_api = "responses"
+requires_openai_auth = true
+
+[model_providers."codex-quick-model-switch".auth]
+command = "/usr/bin/awk"
+args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/jasonxu/.codex-quick-model-switch.env"]
+timeout_ms = 5000
+refresh_interval_ms = 300000
+```
+
+The command-backed auth block lets Codex Desktop read the local router key from the env file that Raycast manages, without needing to launch Codex from a shell that exports `QMS_ROUTER_API_KEY`.
+
+Important: do not use a plain `env_key = "QMS_ROUTER_API_KEY"` setup unless you have proved that Codex receives the same key as the router. Raycast and the LaunchAgent use `~/.codex-quick-model-switch.env`; a stale `QMS_ROUTER_API_KEY` in `~/.zshrc` can be different, and GUI apps may not inherit `.zshrc` at all. If the keys drift, Codex will get `401 invalid api key` even though the router is running.
+
+Restart Codex after changing `config.toml`.
+
+## Validate
+
+Run the automated checks:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+go test ./...
+make build
+
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch/raycast-codex-model-switch
+npm test
+npm run build
+npm run lint
+```
+
+Run live checks:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+./bin/codex-quick-model-switch service status
+./bin/codex-quick-model-switch doctor
+
+ROUTER_KEY="$(awk -F= '$1=="QMS_ROUTER_API_KEY"{print $2; exit}' ~/.codex-quick-model-switch.env)"
+curl -fsS -H "Authorization: Bearer $ROUTER_KEY" http://127.0.0.1:8321/switches
+curl -fsS -X POST -H "Authorization: Bearer $ROUTER_KEY" -H "Content-Type: application/json" -d '{"shortcut":"/msm"}' http://127.0.0.1:8321/switch
+curl -fsS -H "Authorization: Bearer $ROUTER_KEY" http://127.0.0.1:8321/state
+```
+
+For UI validation, launch Raycast with `Command+Space`, run `Codex Model Switch Status`, then run `Switch Codex Model` and choose `/msm` or another configured model.
+
+## Cleanup
+
+Stop and remove the LaunchAgent:
+
+```bash
+cd /Users/jasonxu/Documents/personal/codex-quick-model-switch
+./bin/codex-quick-model-switch service stop
+./bin/codex-quick-model-switch service uninstall
+```
+
+Remove local router files if you no longer need them:
+
+```bash
+rm -f ~/.codex-quick-model-switch.env
+rm -rf ~/Library/Application\ Support/codex-quick-model-switch
+```
+
+Remove the Raycast development extension from Raycast Preferences > Extensions.
+
+To stop using the router from Codex, edit `~/.codex/config.toml` and set `model` / `model_provider` back to your normal provider, then remove the `[model_providers."codex-quick-model-switch"]` and `[model_providers."codex-quick-model-switch".auth]` blocks.
+
+If you no longer want the old Codex slash-command hook, edit `~/.codex/hooks.json` and remove the `UserPromptSubmit` hook command containing:
+
+```text
+codex-quick-model-switch hook --env /Users/jasonxu/.codex-quick-model-switch.env
+```
+
+Keep the `PostToolUse`, `PreToolUse`, `SessionStart`, `Stop`, or unrelated hook entries intact.
+
+## Optional CLI/Hook Install
+
+The Raycast workflow above is preferred. The CLI installer remains useful if you still want Codex prompt shortcuts such as `/msm`.
 
 Build the binary first:
 
@@ -57,6 +198,7 @@ make build
 Run the installer from the built binary:
 
 ```bash
+export QMS_UPSTREAM_API_KEY="your-upstream-api-key"
 ./bin/codex-quick-model-switch install
 ```
 
@@ -64,7 +206,7 @@ Do not use `go run ... install`. The installer records the executable path in th
 
 The installer will:
 
-- create `~/.codex-quick-model-switch.env` if it does not exist
+- create `~/.codex-quick-model-switch.env` if it does not exist, using the required `QMS_UPSTREAM_API_KEY` from your shell
 - back up `~/.codex/hooks.json`
 - print the required `~/.codex/config.toml` changes for you to apply manually
 - add a `UserPromptSubmit` hook entry while preserving existing hooks
@@ -102,20 +244,31 @@ You can also run the router manually:
 
 The router protects local endpoints with `QMS_ROUTER_API_KEY`.
 
-The installer creates this key in:
+Raycast and the installer create this key in:
 
 ```text
 ~/.codex-quick-model-switch.env
 ```
 
-Codex also needs the same value available as `QMS_ROUTER_API_KEY` when it sends requests to the local provider. If you launch Codex from a shell, export it first:
+Codex also needs the same value when it sends requests to the local provider. Prefer the command-backed auth block in `~/.codex/config.toml`:
 
-```bash
-export QMS_ROUTER_API_KEY="$(grep '^QMS_ROUTER_API_KEY=' ~/.codex-quick-model-switch.env | cut -d= -f2-)"
-codex
+```toml
+[model_providers."codex-quick-model-switch".auth]
+command = "/usr/bin/awk"
+args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/jasonxu/.codex-quick-model-switch.env"]
+timeout_ms = 5000
+refresh_interval_ms = 300000
 ```
 
-If you launch Codex Desktop from Finder or another app launcher, make sure the app environment includes the same variable, or edit the provider auth settings in `~/.codex/config.toml` to match your local setup.
+This works for Codex Desktop and shell-launched Codex because Codex reads the token directly from the env file.
+
+Avoid configuring Codex with only:
+
+```toml
+env_key = "QMS_ROUTER_API_KEY"
+```
+
+That relies on Codex inheriting a shell environment value. If `~/.zshrc` and `~/.codex-quick-model-switch.env` contain different router keys, the router will reject Codex requests with `401 invalid api key`.
 
 Restart Codex after installation so it reloads `config.toml` and `hooks.json`.
 
@@ -161,7 +314,7 @@ Supported variables:
 | `QMS_ROUTER_BASE_URL` | derived from listen address | Base URL used by the hook and doctor |
 | `QMS_ROUTER_API_KEY` | generated by installer | Bearer token required by router endpoints |
 | `QMS_UPSTREAM_BASE_URL` | `http://localhost:8317/v1` | Upstream OpenAI-compatible proxy base URL |
-| `QMS_UPSTREAM_API_KEY` | empty | Optional bearer token for the upstream proxy |
+| `QMS_UPSTREAM_API_KEY` | required | Bearer token for the upstream proxy |
 | `QMS_VIRTUAL_MODEL` | `codex-quick-model-switch` | Virtual model name Codex sends to this router |
 | `QMS_SWITCHES` | default shortcut list | Comma-separated shortcut mapping |
 | `QMS_STATE_PATH` | `~/Library/Application Support/codex-quick-model-switch/state.json` | Active switch state file |
@@ -215,9 +368,27 @@ If `doctor` fails:
 
 If Codex says the provider is unauthorized:
 
-- make sure Codex has `QMS_ROUTER_API_KEY` in its environment
-- make sure the value matches `~/.codex-quick-model-switch.env`
+- prefer the command-backed auth block above instead of plain `env_key = "QMS_ROUTER_API_KEY"`
+- make sure the router key from `~/.zshrc` is not drifting from `~/.codex-quick-model-switch.env`
 - restart Codex after changing environment or config
+
+To validate without printing secrets:
+
+```bash
+env_file_value="$(awk -F= '$1=="QMS_ROUTER_API_KEY"{print $2; exit}' ~/.codex-quick-model-switch.env)"
+zsh_value="$(zsh -lic 'printf %s "$QMS_ROUTER_API_KEY"' 2>/dev/null)"
+
+printf 'env file: present=%s len=%s sha256=%s\n' "$([ -n "$env_file_value" ] && printf yes || printf no)" "${#env_file_value}" "$(printf %s "$env_file_value" | shasum -a 256 | awk '{print $1}')"
+printf 'zshrc:    present=%s len=%s sha256=%s\n' "$([ -n "$zsh_value" ] && printf yes || printf no)" "${#zsh_value}" "$(printf %s "$zsh_value" | shasum -a 256 | awk '{print $1}')"
+[ "$env_file_value" = "$zsh_value" ] && echo 'match=yes' || echo 'match=no'
+```
+
+Then prove which key the router accepts:
+
+```bash
+curl -i -H "Authorization: Bearer $zsh_value" http://127.0.0.1:8321/state
+curl -i -H "Authorization: Bearer $env_file_value" http://127.0.0.1:8321/state
+```
 
 If shortcuts reach the model instead of being blocked:
 

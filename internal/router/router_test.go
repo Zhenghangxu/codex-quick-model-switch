@@ -42,6 +42,50 @@ func TestSwitchAndStateEndpoints(t *testing.T) {
 	}
 }
 
+func TestSwitchesEndpointReturnsOrderedSwitchesAndActiveState(t *testing.T) {
+	cfg := config.Config{
+		RouterAPIKey: "router-key",
+		Switches: map[string]config.Switch{
+			"/deep": {Shortcut: "/deep", Model: "gpt-5.5", Effort: "xhigh", ServiceTier: config.ServiceTierStandard},
+			"/mini": {Shortcut: "/mini", Model: "gpt-5.4-mini", Effort: "low", ServiceTier: config.ServiceTierFast},
+		},
+		SwitchOrder: []config.Switch{
+			{Shortcut: "/mini", Model: "gpt-5.4-mini", Effort: "low", ServiceTier: config.ServiceTierFast},
+			{Shortcut: "/deep", Model: "gpt-5.5", Effort: "xhigh", ServiceTier: config.ServiceTierStandard},
+		},
+	}
+	store := state.NewStore(t.TempDir() + "/state.json")
+	if err := store.Save(state.ActiveState{Active: cfg.Switches["/deep"]}); err != nil {
+		t.Fatalf("save state: %v", err)
+	}
+	handler := New(cfg, store, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/switches", nil)
+	req.Header.Set("Authorization", "Bearer router-key")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /switches status = %d body=%s", rr.Code, rr.Body.String())
+	}
+	var got struct {
+		Switches []config.Switch `json:"switches"`
+		Active   config.Switch   `json:"active"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode switches: %v", err)
+	}
+	if len(got.Switches) != 2 {
+		t.Fatalf("switch count = %d", len(got.Switches))
+	}
+	if got.Switches[0].Shortcut != "/mini" || got.Switches[1].Shortcut != "/deep" {
+		t.Fatalf("switch order = %#v", got.Switches)
+	}
+	if got.Active.Shortcut != "/deep" {
+		t.Fatalf("active shortcut = %q", got.Active.Shortcut)
+	}
+}
+
 func TestProxyPatchesVirtualModelAndForwardsExplicitModelUnchanged(t *testing.T) {
 	var bodies []string
 	var authHeaders []string

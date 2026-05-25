@@ -1,0 +1,92 @@
+{
+  "name": "codex-model-switch",
+  "title": "Codex Model Switch",
+  "description": "Configure and switch the Codex quick model switch router from Raycast.",
+  "icon": "icon.png",
+  "author": "thomas",
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "commands": [
+    {
+      "name": "start-llm-server",
+      "title": "Start LLM Server",
+      "description": "Configure and start the Codex model switch router.",
+      "mode": "no-view"
+    },
+    {
+      "name": "switch-codex-model",
+      "title": "Switch Codex Model",
+      "description": "Switch the active Codex model from configured router shortcuts.",
+      "mode": "view"
+    },
+    {
+      "name": "codex-model-switch-status",
+      "title": "Codex Model Switch Status",
+      "description": "Show router, LaunchAgent, and active model status.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "upstreamBaseUrl",
+      "title": "Upstream Base URL",
+      "description": "OpenAI-compatible upstream endpoint that the local router forwards requests to.",
+      "type": "textfield",
+      "required": true,
+      "default": "http://localhost:8317/v1"
+    },
+    {
+      "name": "upstreamApiKey",
+      "title": "Upstream API Key",
+      "description": "Required bearer token for the upstream endpoint.",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "binaryPath",
+      "title": "Router Binary",
+      "description": "Path to the built codex-quick-model-switch binary.",
+      "type": "file",
+      "required": true,
+      "default": "/Users/jasonxu/Documents/personal/codex-quick-model-switch/bin/codex-quick-model-switch"
+    },
+    {
+      "name": "switches",
+      "title": "Model Switches",
+      "description": "Comma-separated shortcuts in /shortcut=model:effort:service_tier format.",
+      "type": "textfield",
+      "required": true,
+      "default": "/msl=gpt-5.3-codex:medium:none,/msm=gpt-5.5:medium:fast,/msh=gpt-5.5:high:standard,/msxh=gpt-5.5:xhigh:standard"
+    },
+    {
+      "name": "listenAddr",
+      "title": "Router Listen Address",
+      "description": "Local address used by the router LaunchAgent.",
+      "type": "textfield",
+      "required": true,
+      "default": "127.0.0.1:8321"
+    }
+  ],
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build -e dist",
+    "lint": "ray lint --relaxed",
+    "lint:store": "ray lint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.104.18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "@types/react": "^19.0.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.13"
+  }
+}

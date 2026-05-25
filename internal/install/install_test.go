@@ -65,10 +65,16 @@ func TestInstallPrintsConfigChangeWithoutTouchingConfigAndPreservesHookEntries(t
 		`base_url = 'http://127.0.0.1:8321/v1'`,
 		`wire_api = 'responses'`,
 		`requires_openai_auth = true`,
+		`[model_providers."codex-quick-model-switch".auth]`,
+		`command = '/usr/bin/awk'`,
+		filepath.Join(home, ".qms.env"),
 	} {
 		if !contains(output, want) {
 			t.Fatalf("installer output missing %q:\n%s", want, output)
 		}
+	}
+	if contains(output, `env_key =`) {
+		t.Fatalf("installer output should use command-backed auth, not env_key:\n%s", output)
 	}
 
 	hooksBytes, err := os.ReadFile(filepath.Join(codexHome, "hooks.json"))
