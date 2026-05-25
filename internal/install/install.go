@@ -208,7 +208,7 @@ func setFeatureHooks(text string) string {
 func upsertProvider(text string, opts Options) string {
 	header := fmt.Sprintf("[model_providers.%q]", opts.ProviderName)
 	authHeader := fmt.Sprintf("[model_providers.%q.auth]", opts.ProviderName)
-	block := fmt.Sprintf("%s\nname = '%s'\nbase_url = '%s'\nwire_api = 'responses'\nrequires_openai_auth = true\n\n%s\ncommand = '/usr/bin/awk'\nargs = %s\ntimeout_ms = 5000\nrefresh_interval_ms = 300000\n", header, escapeTOML(opts.ProviderName), escapeTOML(opts.ListenBaseURL), authHeader, tomlStringArray([]string{"-F=", `$1=="QMS_ROUTER_API_KEY"{print $2; exit}`, opts.HookEnvPath}))
+	block := fmt.Sprintf("%s\nname = '%s'\nbase_url = '%s'\nwire_api = 'responses'\nenv_key = '%s'\nrequires_openai_auth = true\n", header, escapeTOML(opts.ProviderName), escapeTOML(opts.ListenBaseURL), escapeTOML(opts.ProviderAPIKey))
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		if strings.TrimSpace(line) != header {
@@ -216,7 +216,8 @@ func upsertProvider(text string, opts Options) string {
 		}
 		end := len(lines)
 		for j := i + 1; j < len(lines); j++ {
-			if strings.HasPrefix(strings.TrimSpace(lines[j]), "[") {
+			trimmed := strings.TrimSpace(lines[j])
+			if strings.HasPrefix(trimmed, "[") && trimmed != authHeader {
 				end = j
 				break
 			}
@@ -228,12 +229,4 @@ func upsertProvider(text string, opts Options) string {
 
 func escapeTOML(value string) string {
 	return strings.ReplaceAll(value, "'", "''")
-}
-
-func tomlStringArray(values []string) string {
-	quoted := make([]string, 0, len(values))
-	for _, value := range values {
-		quoted = append(quoted, fmt.Sprintf("'%s'", escapeTOML(value)))
-	}
-	return "[" + strings.Join(quoted, ", ") + "]"
 }

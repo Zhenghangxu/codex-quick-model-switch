@@ -14,11 +14,13 @@ The recommended UI is the bundled Raycast extension in:
 
 Raycast is responsible for:
 
-- collecting the upstream LLM endpoint and required API key in Raycast preferences
-- writing `~/.codex-quick-model-switch.env`
+- collecting the upstream LLM endpoint, required API key, listen address, binary path, and switches in Raycast preferences
+- writing `~/.codex-quick-model-switch.env` as a generated runtime file
 - installing and starting the macOS LaunchAgent
 - listing configured model switches
 - switching the active model without typing a prompt into Codex
+
+Raycast preferences are the source of truth for editable settings. Treat `~/.codex-quick-model-switch.env` as private generated plumbing for the LaunchAgent and Codex auth lookup, not as a user-managed config file.
 
 The Go router is still the Codex-facing proxy. Codex sends requests to `http://localhost:8321/v1`; Raycast only configures and controls the router.
 
@@ -91,7 +93,7 @@ Set:
 - `Model Switches`: comma-separated `/shortcut=model:effort:service_tier` mappings
 - `Router Listen Address`: `127.0.0.1:8321`
 
-Run `Toggle LLM Server` from Raycast. When the LaunchAgent is stopped, it writes `~/.codex-quick-model-switch.env`, preserves or generates `QMS_ROUTER_API_KEY`, installs the LaunchAgent, starts it, and runs `doctor`. When the LaunchAgent is already running, it stops it.
+Run `Toggle LLM Server` from Raycast. When the LaunchAgent is stopped, it writes `~/.codex-quick-model-switch.env` from Raycast preferences, preserves or generates `QMS_ROUTER_API_KEY`, installs the LaunchAgent, starts it, and runs `doctor`. When the LaunchAgent is already running, it stops it.
 
 Then run `Switch Codex Model` from Raycast and choose the active model. `Codex Model Switch Status` shows the LaunchAgent state, router health, active model, env path, and binary path.
 
@@ -110,18 +112,13 @@ hooks = true
 name = "codex-quick-model-switch"
 base_url = "http://localhost:8321/v1"
 wire_api = "responses"
+env_key = "QMS_ROUTER_API_KEY"
 requires_openai_auth = true
-
-[model_providers."codex-quick-model-switch".auth]
-command = "/usr/bin/awk"
-args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/you/.codex-quick-model-switch.env"]
-timeout_ms = 5000
-refresh_interval_ms = 300000
 ```
 
-The command-backed auth block lets Codex Desktop read the local router key from the env file that Raycast manages, without needing to launch Codex from a shell that exports `QMS_ROUTER_API_KEY`.
+`env_key = "QMS_ROUTER_API_KEY"` tells Codex which environment variable contains the local router bearer token.
 
-Important: do not use a plain `env_key = "QMS_ROUTER_API_KEY"` setup unless you have proved that Codex receives the same key as the router. Raycast and the LaunchAgent use `~/.codex-quick-model-switch.env`; a stale `QMS_ROUTER_API_KEY` in `~/.zshrc` can be different, and GUI apps may not inherit `.zshrc` at all. If the keys drift, Codex will get `401 invalid api key` even though the router is running.
+Important: do not add a nested `[model_providers."codex-quick-model-switch".auth]` command block for this provider. The local working configuration uses `env_key = "QMS_ROUTER_API_KEY"` together with `requires_openai_auth = true`.
 
 Restart Codex after changing `config.toml`.
 
@@ -174,7 +171,7 @@ rm -rf ~/Library/Application\ Support/codex-quick-model-switch
 
 Remove the Raycast development extension from Raycast Preferences > Extensions.
 
-To stop using the router from Codex, edit `~/.codex/config.toml` and set `model` / `model_provider` back to your normal provider, then remove the `[model_providers."codex-quick-model-switch"]` and `[model_providers."codex-quick-model-switch".auth]` blocks.
+To stop using the router from Codex, edit `~/.codex/config.toml` and set `model` / `model_provider` back to your normal provider, then remove the `[model_providers."codex-quick-model-switch"]` block.
 
 If you no longer want the old Codex slash-command hook, edit `~/.codex/hooks.json` and remove the `UserPromptSubmit` hook command containing:
 
@@ -244,31 +241,35 @@ You can also run the router manually:
 
 The router protects local endpoints with `QMS_ROUTER_API_KEY`.
 
+Raycast owns the editable router settings. The env file below is generated whenever `Toggle LLM Server` starts the service, and should not be manually edited.
+
 Raycast and the installer create this key in:
 
 ```text
 ~/.codex-quick-model-switch.env
 ```
 
-Codex also needs the same value when it sends requests to the local provider. Prefer the command-backed auth block in `~/.codex/config.toml`:
+Codex also needs the same value when it sends requests to the local provider. Use `env_key = "QMS_ROUTER_API_KEY"` in `~/.codex/config.toml`:
+
+```toml
+[model_providers."codex-quick-model-switch"]
+name = "codex-quick-model-switch"
+base_url = "http://localhost:8321/v1"
+wire_api = "responses"
+env_key = "QMS_ROUTER_API_KEY"
+requires_openai_auth = true
+```
+
+This is the expected local configuration shape for this project.
+
+Avoid adding a nested command-backed auth section:
 
 ```toml
 [model_providers."codex-quick-model-switch".auth]
 command = "/usr/bin/awk"
-args = ["-F=", "$1==\"QMS_ROUTER_API_KEY\"{print $2; exit}", "/Users/you/.codex-quick-model-switch.env"]
-timeout_ms = 5000
-refresh_interval_ms = 300000
 ```
 
-This works for Codex Desktop and shell-launched Codex because Codex reads the token directly from the env file.
-
-Avoid configuring Codex with only:
-
-```toml
-env_key = "QMS_ROUTER_API_KEY"
-```
-
-That relies on Codex inheriting a shell environment value. If `~/.zshrc` and `~/.codex-quick-model-switch.env` contain different router keys, the router will reject Codex requests with `401 invalid api key`.
+That shape has caused local Codex provider auth problems for this project.
 
 Restart Codex after installation so it reloads `config.toml` and `hooks.json`.
 
@@ -368,8 +369,9 @@ If `doctor` fails:
 
 If Codex says the provider is unauthorized:
 
-- prefer the command-backed auth block above instead of plain `env_key = "QMS_ROUTER_API_KEY"`
-- make sure the router key from `~/.zshrc` is not drifting from `~/.codex-quick-model-switch.env`
+- keep `env_key = "QMS_ROUTER_API_KEY"` in `~/.codex/config.toml`
+- do not add a nested `[model_providers."codex-quick-model-switch".auth]` command block
+- make sure the router key visible to Codex is the same value as `~/.codex-quick-model-switch.env`
 - restart Codex after changing environment or config
 
 To validate without printing secrets:

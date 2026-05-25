@@ -3,7 +3,7 @@
   "title": "Codex Model Switch",
   "description": "Configure and switch the Codex quick model switch router from Raycast.",
   "icon": "icon.png",
-  "author": "codex-quick-model-switch contributors",
+  "author": "thomas",
   "license": "MIT",
   "platforms": [
     "macOS"

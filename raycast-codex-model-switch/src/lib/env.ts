@@ -15,6 +15,19 @@ const ENV_ORDER = [
 export const DEFAULT_ENV_PATH = `${process.env.HOME ?? ""}/.codex-quick-model-switch.env`;
 export const VIRTUAL_MODEL = "codex-quick-model-switch";
 
+export type EnvReadResult = {
+  exists: boolean;
+  values: Record<string, string>;
+};
+
+export type GeneratedEnvStatus = {
+  exists: boolean;
+  routerKeyPresent: boolean;
+  matchesPreferences: boolean;
+  differences: string[];
+  values: Record<string, string>;
+};
+
 export function parseEnvFile(text: string): Record<string, string> {
   const values: Record<string, string> = {};
   for (const rawLine of text.split(/\r?\n/)) {
@@ -76,14 +89,68 @@ export function toEnvValues(
 }
 
 export async function readEnvValues(envPath: string): Promise<Record<string, string>> {
+  return (await readEnvValuesWithPresence(envPath)).values;
+}
+
+export async function readEnvValuesWithPresence(envPath: string): Promise<EnvReadResult> {
   try {
-    return parseEnvFile(await readFile(envPath, "utf8"));
+    return { exists: true, values: parseEnvFile(await readFile(envPath, "utf8")) };
   } catch (error) {
     if (isNotFound(error)) {
-      return {};
+      return { exists: false, values: {} };
     }
     throw error;
   }
+}
+
+export async function generatedEnvStatus(
+  envPath: string,
+  preferences: PreferencesLike,
+  readEnv: (envPath: string) => Promise<EnvReadResult> = readEnvValuesWithPresence,
+): Promise<GeneratedEnvStatus> {
+  const result = await readEnv(envPath);
+  if (!result.exists) {
+    return {
+      exists: false,
+      routerKeyPresent: false,
+      matchesPreferences: false,
+      differences: ["Env file is missing"],
+      values: result.values,
+    };
+  }
+
+  const differences = compareGeneratedEnv(result.values, preferences);
+  return {
+    exists: result.exists,
+    routerKeyPresent: Boolean(result.values.QMS_ROUTER_API_KEY),
+    matchesPreferences: result.exists && differences.length === 0,
+    differences,
+    values: result.values,
+  };
+}
+
+function compareGeneratedEnv(values: Record<string, string>, preferences: PreferencesLike): string[] {
+  const expected = {
+    QMS_LISTEN_ADDR: preferences.listenAddr.trim(),
+    QMS_UPSTREAM_BASE_URL: preferences.upstreamBaseUrl.trim().replace(/\/+$/, ""),
+    QMS_UPSTREAM_API_KEY: preferences.upstreamApiKey?.trim() ?? "",
+    QMS_VIRTUAL_MODEL: VIRTUAL_MODEL,
+    QMS_SWITCHES: preferences.switches.trim(),
+  };
+  const labels: Record<keyof typeof expected, string> = {
+    QMS_LISTEN_ADDR: "Raycast Router Listen Address",
+    QMS_UPSTREAM_BASE_URL: "Raycast Upstream Base URL",
+    QMS_UPSTREAM_API_KEY: "Raycast Upstream API Key",
+    QMS_VIRTUAL_MODEL: "generated virtual model",
+    QMS_SWITCHES: "Raycast Model Switches",
+  };
+
+  return (Object.keys(expected) as Array<keyof typeof expected>).flatMap((key) => {
+    if ((values[key] ?? "") === expected[key]) {
+      return [];
+    }
+    return [`${key} differs from ${labels[key]}`];
+  });
 }
 
 export async function writeRouterEnv(envPath: string, preferences: PreferencesLike): Promise<string> {

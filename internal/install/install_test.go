@@ -64,17 +64,21 @@ func TestInstallPrintsConfigChangeWithoutTouchingConfigAndPreservesHookEntries(t
 		`hooks = true`,
 		`base_url = 'http://127.0.0.1:8321/v1'`,
 		`wire_api = 'responses'`,
+		`env_key = 'local-router'`,
 		`requires_openai_auth = true`,
-		`[model_providers."codex-quick-model-switch".auth]`,
-		`command = '/usr/bin/awk'`,
-		filepath.Join(home, ".qms.env"),
 	} {
 		if !contains(output, want) {
 			t.Fatalf("installer output missing %q:\n%s", want, output)
 		}
 	}
-	if contains(output, `env_key =`) {
-		t.Fatalf("installer output should use command-backed auth, not env_key:\n%s", output)
+	for _, unwanted := range []string{
+		`[model_providers."codex-quick-model-switch".auth]`,
+		`command = '/usr/bin/awk'`,
+		filepath.Join(home, ".qms.env"),
+	} {
+		if contains(output, unwanted) {
+			t.Fatalf("installer output should not contain %q:\n%s", unwanted, output)
+		}
 	}
 
 	hooksBytes, err := os.ReadFile(filepath.Join(codexHome, "hooks.json"))
@@ -102,6 +106,53 @@ func TestInstallPrintsConfigChangeWithoutTouchingConfigAndPreservesHookEntries(t
 	handler := handlers[0].(map[string]any)
 	if handler["type"] != "command" || !contains(handler["command"].(string), "codex-quick-model-switch hook") {
 		t.Fatalf("UserPromptSubmit command hook not installed with current schema:\n%s", hooksBytes)
+	}
+}
+
+func TestUpsertProviderUsesEnvKeyAndRemovesCommandBackedAuth(t *testing.T) {
+	input := `model = 'old'
+
+[model_providers."codex-quick-model-switch"]
+name = 'old'
+base_url = 'http://old/v1'
+wire_api = 'responses'
+requires_openai_auth = true
+
+[model_providers."codex-quick-model-switch".auth]
+command = '/usr/bin/awk'
+args = ['-F=', '$1=="QMS_ROUTER_API_KEY"{print $2; exit}', '/Users/example/.codex-quick-model-switch.env']
+timeout_ms = 5000
+refresh_interval_ms = 300000
+
+[model_providers.other]
+name = 'other'
+`
+
+	output := upsertProvider(input, Options{
+		ProviderName:   "codex-quick-model-switch",
+		ListenBaseURL:  "http://127.0.0.1:8321/v1",
+		ProviderAPIKey: "QMS_ROUTER_API_KEY",
+	})
+
+	for _, want := range []string{
+		`[model_providers."codex-quick-model-switch"]`,
+		`base_url = 'http://127.0.0.1:8321/v1'`,
+		`env_key = 'QMS_ROUTER_API_KEY'`,
+		`requires_openai_auth = true`,
+		`[model_providers.other]`,
+	} {
+		if !contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+	for _, unwanted := range []string{
+		`[model_providers."codex-quick-model-switch".auth]`,
+		`command = '/usr/bin/awk'`,
+		`timeout_ms = 5000`,
+	} {
+		if contains(output, unwanted) {
+			t.Fatalf("output should not contain %q:\n%s", unwanted, output)
+		}
 	}
 }
 

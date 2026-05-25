@@ -1,6 +1,6 @@
 import { Action, ActionPanel, Detail, Icon, openExtensionPreferences, showToast, Toast } from "@raycast/api";
 import { useEffect, useMemo, useState } from "react";
-import { DEFAULT_ENV_PATH, readEnvValues } from "./lib/env";
+import { DEFAULT_ENV_PATH, generatedEnvStatus } from "./lib/env";
 import { getSwitches, healthz, routerBaseUrl } from "./lib/router";
 import { serviceStatus, toggleServer } from "./lib/service";
 import { preferences } from "./preferences";
@@ -12,7 +12,10 @@ type StatusState =
       routerHealthy: boolean;
       active: string;
       serviceOutput: string;
+      envExists: boolean;
       routerKeyPresent: boolean;
+      envMatchesPreferences: boolean;
+      envDifferences: string[];
     }
   | { status: "error"; message: string };
 
@@ -24,8 +27,8 @@ export default function Command() {
   async function load() {
     try {
       setState({ status: "loading" });
-      const env = await readEnvValues(DEFAULT_ENV_PATH);
-      const routerKey = env.QMS_ROUTER_API_KEY ?? "";
+      const envStatus = await generatedEnvStatus(DEFAULT_ENV_PATH, prefs);
+      const routerKey = envStatus.values.QMS_ROUTER_API_KEY ?? "";
       const [routerHealthy, switches, service] = await Promise.all([
         healthz(baseUrl),
         getSwitches(baseUrl, routerKey).catch(() => undefined),
@@ -42,7 +45,10 @@ export default function Command() {
         routerHealthy,
         active,
         serviceOutput: [service.stdout, service.stderr].filter(Boolean).join("\n").trim() || "No service output",
-        routerKeyPresent: routerKey.length > 0,
+        envExists: envStatus.exists,
+        routerKeyPresent: envStatus.routerKeyPresent,
+        envMatchesPreferences: envStatus.matchesPreferences,
+        envDifferences: envStatus.differences,
       });
     } catch (error) {
       setState({ status: "error", message: error instanceof Error ? error.message : String(error) });
@@ -64,12 +70,17 @@ export default function Command() {
   const markdown = [
     "# Codex Model Switch Status",
     "",
+    "- Editable settings: Raycast extension preferences",
+    `- Generated env: ${state.envExists ? DEFAULT_ENV_PATH : `missing at ${DEFAULT_ENV_PATH}`}`,
+    `- Env matches preferences: ${state.envMatchesPreferences ? "yes" : "no"}`,
     `- Router: ${state.routerHealthy ? "healthy" : "unreachable"}`,
     `- Active: ${state.active}`,
     `- Router key: ${state.routerKeyPresent ? "present" : "missing"}`,
     `- Router URL: ${baseUrl}`,
-    `- Env file: ${DEFAULT_ENV_PATH}`,
     `- Binary: ${prefs.binaryPath}`,
+    ...(state.envDifferences.length > 0
+      ? ["", "## Generated Env Drift", "", ...state.envDifferences.map((difference) => `- ${difference}`)]
+      : []),
     "",
     "## LaunchAgent",
     "",

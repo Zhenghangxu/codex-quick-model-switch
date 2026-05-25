@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEnvFile, parseEnvFile, toEnvValues } from "../src/lib/env";
+import { formatEnvFile, generatedEnvStatus, parseEnvFile, toEnvValues } from "../src/lib/env";
 
 describe("env file helpers", () => {
   it("parses comments, blank lines, and quoted values", () => {
@@ -92,5 +92,79 @@ EMPTY=
         "",
       ].join("\n"),
     );
+  });
+
+  it("reports when the generated env file is missing", async () => {
+    const status = await generatedEnvStatus("/tmp/does-not-exist-qms.env", {
+      listenAddr: "127.0.0.1:8321",
+      upstreamBaseUrl: "http://localhost:8317/v1",
+      upstreamApiKey: "upstream-key",
+      switches: "/msm=gpt-5.5:medium:fast",
+    });
+
+    expect(status.exists).toBe(false);
+    expect(status.routerKeyPresent).toBe(false);
+    expect(status.matchesPreferences).toBe(false);
+    expect(status.differences).toEqual(["Env file is missing"]);
+  });
+
+  it("reports drift between generated env values and Raycast preferences", async () => {
+    const status = await generatedEnvStatus(
+      "/tmp/qms.env",
+      {
+        listenAddr: "127.0.0.1:8321",
+        upstreamBaseUrl: "http://localhost:8317/v1/",
+        upstreamApiKey: "new-upstream-key",
+        switches: "/msm=gpt-5.5:medium:fast",
+      },
+      async () => ({
+        exists: true,
+        values: {
+          QMS_LISTEN_ADDR: "127.0.0.1:9999",
+          QMS_ROUTER_API_KEY: "router-key",
+          QMS_UPSTREAM_BASE_URL: "http://localhost:8317/v1",
+          QMS_UPSTREAM_API_KEY: "old-upstream-key",
+          QMS_VIRTUAL_MODEL: "codex-quick-model-switch",
+          QMS_SWITCHES: "/msl=gpt-5.3-codex:medium:none",
+        },
+      }),
+    );
+
+    expect(status.exists).toBe(true);
+    expect(status.routerKeyPresent).toBe(true);
+    expect(status.matchesPreferences).toBe(false);
+    expect(status.differences).toEqual([
+      "QMS_LISTEN_ADDR differs from Raycast Router Listen Address",
+      "QMS_UPSTREAM_API_KEY differs from Raycast Upstream API Key",
+      "QMS_SWITCHES differs from Raycast Model Switches",
+    ]);
+  });
+
+  it("reports generated env as matching current Raycast preferences", async () => {
+    const status = await generatedEnvStatus(
+      "/tmp/qms.env",
+      {
+        listenAddr: "127.0.0.1:8321",
+        upstreamBaseUrl: "http://localhost:8317/v1/",
+        upstreamApiKey: "upstream-key",
+        switches: "/msm=gpt-5.5:medium:fast",
+      },
+      async () => ({
+        exists: true,
+        values: {
+          QMS_LISTEN_ADDR: "127.0.0.1:8321",
+          QMS_ROUTER_API_KEY: "router-key",
+          QMS_UPSTREAM_BASE_URL: "http://localhost:8317/v1",
+          QMS_UPSTREAM_API_KEY: "upstream-key",
+          QMS_VIRTUAL_MODEL: "codex-quick-model-switch",
+          QMS_SWITCHES: "/msm=gpt-5.5:medium:fast",
+        },
+      }),
+    );
+
+    expect(status.exists).toBe(true);
+    expect(status.routerKeyPresent).toBe(true);
+    expect(status.matchesPreferences).toBe(true);
+    expect(status.differences).toEqual([]);
   });
 });
