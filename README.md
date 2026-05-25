@@ -2,6 +2,8 @@
 
 `codex-quick-model-switch` is a small local router for Codex that lets you switch the model, reasoning effort, and service tier from Raycast using configured switches such as `/light`, `/medium`, `/high`, or `/extra-high`.
 
+This project is only for Codex setups that use an API key through an OpenAI-compatible upstream proxy such as CliProxyAPI. It is not for Codex users who use Codex directly through OAuth without an API-key-backed provider.
+
 It is designed for manual switching only. There is no classifier, no prompt extraction, no automatic routing, and no Groq dependency.
 
 ## Quick Start
@@ -58,6 +60,17 @@ cd /path/to/codex-quick-model-switch
 ./bin/codex-quick-model-switch doctor
 ```
 
+## Default Switches
+
+| Switch | Model | Reasoning effort | Service tier |
+| --- | --- | --- | --- |
+| `/light` | `gpt-5.3-codex` | `medium` | none |
+| `/medium` | `gpt-5.5` | `medium` | `fast` |
+| `/high` | `gpt-5.5` | `high` | standard/default |
+| `/extra-high` | `gpt-5.5` | `xhigh` | standard/default |
+
+Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, and `standard` sends the upstream-compatible default value currently used by this tool.
+
 ## Raycast Workflow
 
 The recommended UI is the bundled Raycast extension in:
@@ -95,17 +108,6 @@ For normal proxying, the router keeps requests as stable as possible. If the req
 - top-level `service_tier`
 
 Everything else, including prompt input, tools, metadata, and unrelated fields, is preserved.
-
-## Default Switches
-
-| Switch | Model | Reasoning effort | Service tier |
-| --- | --- | --- | --- |
-| `/light` | `gpt-5.3-codex` | `medium` | none |
-| `/medium` | `gpt-5.5` | `medium` | `fast` |
-| `/high` | `gpt-5.5` | `high` | standard/default |
-| `/extra-high` | `gpt-5.5` | `xhigh` | standard/default |
-
-Internally, `none` removes `service_tier`, `fast` sends `service_tier: "fast"`, and `standard` sends the upstream-compatible default value currently used by this tool.
 
 ## Install With Raycast
 
