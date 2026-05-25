@@ -4,7 +4,7 @@
 
 This project is only for Codex setups that use an API key through an OpenAI-compatible upstream proxy such as CliProxyAPI. It is not for Codex users who use Codex directly through OAuth without an API-key-backed provider.
 
-It is designed for manual switching only. There is no classifier, no prompt extraction, no automatic routing, and no Groq dependency.
+It is designed for manual switching only. There is no automatic routing.
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ These steps assume the repo is already cloned, but no Raycast preferences, route
    export QMS_ROUTER_API_KEY="paste-generated-router-key-here"
    ```
 
-6. Restart Codex, then add this provider to `~/.codex/config.toml`:
+6. Add this provider to `~/.codex/config.toml`, make sure you remove the original `model` and `model_provider`, then restart codex:
 
    ```toml
    model = "codex-quick-model-switch"
