@@ -1,8 +1,10 @@
 package router
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -86,7 +88,7 @@ func TestSwitchesEndpointReturnsOrderedSwitchesAndActiveState(t *testing.T) {
 	}
 }
 
-func TestProxyPatchesVirtualModelAndForwardsExplicitModelUnchanged(t *testing.T) {
+func TestProxyPatchesRequestsToActiveModel(t *testing.T) {
 	var bodies []string
 	var authHeaders []string
 	var upstreamQueries []string
@@ -139,14 +141,63 @@ func TestProxyPatchesVirtualModelAndForwardsExplicitModelUnchanged(t *testing.T)
 	if !strings.Contains(bodies[0], `"model":"gpt-5.5"`) || !strings.Contains(bodies[0], `"service_tier":"fast"`) {
 		t.Fatalf("virtual request was not patched correctly: %s", bodies[0])
 	}
-	if bodies[1] != explicitBody {
-		t.Fatalf("explicit request changed:\n got %s\nwant %s", bodies[1], explicitBody)
+	if !strings.Contains(bodies[1], `"model":"gpt-5.5"`) || !strings.Contains(bodies[1], `"reasoning":{"effort":"medium"}`) || !strings.Contains(bodies[1], `"service_tier":"fast"`) {
+		t.Fatalf("explicit request was not patched correctly: %s", bodies[1])
 	}
 	if authHeaders[0] != "Bearer upstream-key" || authHeaders[1] != "Bearer upstream-key" {
 		t.Fatalf("upstream auth headers = %#v", authHeaders)
 	}
 	if upstreamQueries[0] != "beta=true" {
 		t.Fatalf("upstream query = %q", upstreamQueries[0])
+	}
+}
+
+func TestProxyLogsWhetherRequestWasPatched(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	cfg := config.Config{
+		UpstreamBaseURL: upstream.URL + "/v1",
+		RouterAPIKey:    "router-key",
+		UpstreamAPIKey:  "upstream-key",
+		VirtualModel:    "codex-quick-model-switch",
+		Switches: map[string]config.Switch{
+			"/high": {Shortcut: "/high", Model: "gpt-5.5", Effort: "high", ServiceTier: config.ServiceTierFast},
+		},
+	}
+	store := state.NewStore(t.TempDir() + "/state.json")
+	if err := store.Save(state.ActiveState{Active: cfg.Switches["/high"]}); err != nil {
+		t.Fatalf("save state: %v", err)
+	}
+	var logs bytes.Buffer
+	handler := NewWithLogger(cfg, store, http.DefaultClient, log.New(&logs, "", 0))
+
+	for _, body := range []string{
+		`{"model":"codex-quick-model-switch","input":"hi"}`,
+		`{"model":"gpt-5.3-codex","input":"hi"}`,
+		`{"model":"gpt-5.5","input":"hi"}`,
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer router-key")
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("proxy status = %d body=%s", rr.Code, rr.Body.String())
+		}
+	}
+
+	text := logs.String()
+	for _, want := range []string{
+		`patched=true requested_model="codex-quick-model-switch" forwarded_model="gpt-5.5" forwarded_effort_field="reasoning.effort" forwarded_effort="high" forwarded_service_tier="fast" active_shortcut="/high" active_model="gpt-5.5" active_effort="high" active_service_tier="fast"`,
+		`patched=true requested_model="gpt-5.3-codex" forwarded_model="gpt-5.5" forwarded_effort_field="reasoning.effort" forwarded_effort="high" forwarded_service_tier="fast" active_shortcut="/high" active_model="gpt-5.5" active_effort="high" active_service_tier="fast"`,
+		`patched=true requested_model="gpt-5.5" forwarded_model="gpt-5.5" forwarded_effort_field="reasoning.effort" forwarded_effort="high" forwarded_service_tier="fast" active_shortcut="/high" active_model="gpt-5.5" active_effort="high" active_service_tier="fast"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("logs missing %q:\n%s", want, text)
+		}
 	}
 }
 

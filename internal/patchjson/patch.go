@@ -8,9 +8,9 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-func PatchRequest(body []byte, virtualModel string, active config.Switch) ([]byte, bool, error) {
+func PatchRequest(body []byte, _ string, active config.Switch) ([]byte, bool, error) {
 	model := gjson.GetBytes(body, "model")
-	if !model.Exists() || model.String() != virtualModel {
+	if !model.Exists() {
 		return body, false, nil
 	}
 	if !gjson.ValidBytes(body) {
@@ -28,7 +28,7 @@ func PatchRequest(body []byte, virtualModel string, active config.Switch) ([]byt
 		return nil, false, err
 	}
 
-	if gjson.Get(out, "reasoning").Exists() {
+	if gjson.Get(out, "reasoning").Exists() || !gjson.Get(out, "messages").Exists() {
 		out, err = sjson.SetOptions(out, "reasoning.effort", active.Effort, opts)
 	} else {
 		out, err = sjson.SetOptions(out, "reasoning_effort", active.Effort, opts)

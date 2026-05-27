@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"codex-quick-model-switch/internal/config"
 	"codex-quick-model-switch/internal/hook"
@@ -96,6 +97,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if err := validateCodexConfig(defaultCodexConfigPath(), cfg.VirtualModel, "codex-quick-model-switch"); err != nil {
+			return err
+		}
 		resp, err := http.Get(cfg.RouterBaseURL + "/healthz")
 		if err != nil {
 			return err
@@ -111,6 +115,57 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	default:
 		return usage()
 	}
+}
+
+func validateCodexConfig(path, virtualModel, providerName string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("Codex config %s is missing; add model = %q and model_provider = %q", path, virtualModel, providerName)
+	}
+	if err != nil {
+		return err
+	}
+	text := string(data)
+	if got := topLevelTOMLString(text, "model"); got != virtualModel {
+		return fmt.Errorf("Codex config %s must set model = %q; got %q", path, virtualModel, got)
+	}
+	if got := topLevelTOMLString(text, "model_provider"); got != providerName {
+		return fmt.Errorf("Codex config %s must set model_provider = %q; got %q", path, providerName, got)
+	}
+	return nil
+}
+
+func topLevelTOMLString(text, key string) string {
+	prefix := key + " "
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") {
+			return ""
+		}
+		if !strings.HasPrefix(trimmed, prefix) {
+			continue
+		}
+		left, right, ok := strings.Cut(trimmed, "=")
+		if !ok || strings.TrimSpace(left) != key {
+			continue
+		}
+		return trimTOMLString(right)
+	}
+	return ""
+}
+
+func trimTOMLString(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= 2 {
+		quote := value[0]
+		if (quote == '\'' || quote == '"') && value[len(value)-1] == quote {
+			return value[1 : len(value)-1]
+		}
+	}
+	return value
 }
 
 func runService(args []string) error {
@@ -158,6 +213,10 @@ func writeDefaultEnv(path string) error {
 
 func defaultEnvPath() string {
 	return filepath.Join(mustHome(), ".codex-quick-model-switch.env")
+}
+
+func defaultCodexConfigPath() string {
+	return filepath.Join(mustHome(), ".codex", "config.toml")
 }
 
 func generateKey() (string, error) {

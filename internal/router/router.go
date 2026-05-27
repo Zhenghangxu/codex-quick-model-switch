@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -20,13 +21,22 @@ type Handler struct {
 	cfg    config.Config
 	store  *state.Store
 	client *http.Client
+	logger logger
+}
+
+type logger interface {
+	Printf(format string, v ...any)
 }
 
 func New(cfg config.Config, store *state.Store, client *http.Client) http.Handler {
+	return NewWithLogger(cfg, store, client, log.Default())
+}
+
+func NewWithLogger(cfg config.Config, store *state.Store, client *http.Client, logger logger) http.Handler {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return &Handler{cfg: cfg, store: store, client: client}
+	return &Handler{cfg: cfg, store: store, client: client, logger: logger}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -130,18 +140,20 @@ func (h *Handler) handleProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	patched, _, err := patchjson.PatchRequest(body, h.cfg.VirtualModel, st.Active)
+	requestedModel := requestedModel(body)
+	patchedBody, wasPatched, err := patchjson.PatchRequest(body, h.cfg.VirtualModel, st.Active)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	h.logProxy(wasPatched, requestedModel, patchedBody, st.Active)
 
 	target, err := h.upstreamURL(r.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(patched))
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(patchedBody))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -152,7 +164,7 @@ func (h *Handler) handleProxy(w http.ResponseWriter, r *http.Request) {
 	if h.cfg.UpstreamAPIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+h.cfg.UpstreamAPIKey)
 	}
-	req.ContentLength = int64(len(patched))
+	req.ContentLength = int64(len(patchedBody))
 	resp, err := h.client.Do(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -167,6 +179,66 @@ func (h *Handler) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
+}
+
+func (h *Handler) logProxy(patched bool, requestedModel string, forwardedBody []byte, active config.Switch) {
+	if h.logger == nil {
+		return
+	}
+	summary := forwardedSummary(forwardedBody)
+	h.logger.Printf(
+		"qms proxy patched=%t requested_model=%q forwarded_model=%q forwarded_effort_field=%q forwarded_effort=%q forwarded_service_tier=%q active_shortcut=%q active_model=%q active_effort=%q active_service_tier=%q",
+		patched,
+		requestedModel,
+		summary.model,
+		summary.effortField,
+		summary.effort,
+		summary.serviceTier,
+		active.Shortcut,
+		active.Model,
+		active.Effort,
+		active.ServiceTier,
+	)
+}
+
+type requestSummary struct {
+	model       string
+	effortField string
+	effort      string
+	serviceTier string
+}
+
+func forwardedSummary(body []byte) requestSummary {
+	var req struct {
+		Model     string `json:"model"`
+		Reasoning struct {
+			Effort string `json:"effort"`
+		} `json:"reasoning"`
+		ReasoningEffort string `json:"reasoning_effort"`
+		ServiceTier     string `json:"service_tier"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return requestSummary{}
+	}
+	summary := requestSummary{model: req.Model, serviceTier: req.ServiceTier}
+	if req.Reasoning.Effort != "" {
+		summary.effortField = "reasoning.effort"
+		summary.effort = req.Reasoning.Effort
+	} else if req.ReasoningEffort != "" {
+		summary.effortField = "reasoning_effort"
+		summary.effort = req.ReasoningEffort
+	}
+	return summary
+}
+
+func requestedModel(body []byte) string {
+	var req struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return ""
+	}
+	return req.Model
 }
 
 func (h *Handler) upstreamURL(requestURL *url.URL) (string, error) {
