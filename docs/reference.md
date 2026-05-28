@@ -117,7 +117,7 @@ QMS_SWITCHES=/mini=gpt-5.4-mini:low:fast,/deep=gpt-5.5:xhigh:standard
 Allowed reasoning efforts:
 
 ```text
-minimal, low, medium, high, xhigh
+none, minimal, low, medium, high, xhigh
 ```
 
 Allowed service tiers:

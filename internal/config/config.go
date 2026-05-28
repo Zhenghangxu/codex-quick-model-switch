@@ -184,7 +184,7 @@ func expandHome(path string) string {
 
 func validEffort(effort string) bool {
 	switch effort {
-	case "minimal", "low", "medium", "high", "xhigh":
+	case "none", "minimal", "low", "medium", "high", "xhigh":
 		return true
 	default:
 		return false

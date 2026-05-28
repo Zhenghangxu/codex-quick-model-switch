@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,30 @@ func TestLoadPreservesSwitchOrder(t *testing.T) {
 	}
 	if cfg.Switches["/deep"].Effort != "xhigh" {
 		t.Fatalf("/deep effort = %q", cfg.Switches["/deep"].Effort)
+	}
+}
+
+func TestParseSwitchesAcceptsOpenAIStyleEfforts(t *testing.T) {
+	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh"} {
+		t.Run(effort, func(t *testing.T) {
+			switches, err := ParseSwitches("/effort=gpt-5.4:" + effort + ":standard")
+			if err != nil {
+				t.Fatalf("ParseSwitches returned error: %v", err)
+			}
+			if switches["/effort"].Effort != effort {
+				t.Fatalf("effort = %q, want %q", switches["/effort"].Effort, effort)
+			}
+		})
+	}
+}
+
+func TestParseSwitchesRejectsInvalidEffort(t *testing.T) {
+	_, err := ParseSwitches("/effort=gpt-5.4:turbo:standard")
+	if err == nil {
+		t.Fatal("expected invalid effort error")
+	}
+	if !strings.Contains(err.Error(), `invalid effort "turbo"`) {
+		t.Fatalf("error = %q", err.Error())
 	}
 }
 

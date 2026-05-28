@@ -79,6 +79,28 @@ func TestResponsesRequestWithoutReasoningPatchesNestedEffort(t *testing.T) {
 	}
 }
 
+func TestResponsesRequestPatchesNoneReasoningEffortAndRemovesTier(t *testing.T) {
+	body := []byte(`{"model":"codex-quick-model-switch","input":"hi","service_tier":"fast"}`)
+	sw := config.Switch{Model: "gpt-5.4", Effort: "none", ServiceTier: config.ServiceTierNone}
+
+	out, patched, err := PatchRequest(body, "codex-quick-model-switch", sw)
+	if err != nil {
+		t.Fatalf("PatchRequest returned error: %v", err)
+	}
+	if !patched {
+		t.Fatal("expected patch")
+	}
+	if !bytes.Contains(out, []byte(`"reasoning":{"effort":"none"}`)) {
+		t.Fatalf("responses reasoning effort was not patched to none: %s", out)
+	}
+	if bytes.Contains(out, []byte(`reasoning_effort`)) {
+		t.Fatalf("responses request used chat completions reasoning field: %s", out)
+	}
+	if bytes.Contains(out, []byte(`service_tier`)) {
+		t.Fatalf("service_tier was not removed: %s", out)
+	}
+}
+
 func TestVirtualChatRequestPatchesReasoningEffortAndRemovesTier(t *testing.T) {
 	body := []byte(`{"model":"codex-quick-model-switch","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"high","service_tier":"fast"}`)
 	sw := config.Switch{Model: "gpt-5.3-codex", Effort: "medium", ServiceTier: config.ServiceTierNone}
@@ -95,6 +117,25 @@ func TestVirtualChatRequestPatchesReasoningEffortAndRemovesTier(t *testing.T) {
 	}
 	if !bytes.Contains(out, []byte(`"reasoning_effort":"medium"`)) {
 		t.Fatalf("reasoning_effort not patched: %s", out)
+	}
+	if bytes.Contains(out, []byte(`service_tier`)) {
+		t.Fatalf("service_tier was not removed: %s", out)
+	}
+}
+
+func TestVirtualChatRequestPatchesNoneReasoningEffortAndRemovesTier(t *testing.T) {
+	body := []byte(`{"model":"codex-quick-model-switch","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"high","service_tier":"fast"}`)
+	sw := config.Switch{Model: "gpt-5.4", Effort: "none", ServiceTier: config.ServiceTierNone}
+
+	out, patched, err := PatchRequest(body, "codex-quick-model-switch", sw)
+	if err != nil {
+		t.Fatalf("PatchRequest returned error: %v", err)
+	}
+	if !patched {
+		t.Fatal("expected patch")
+	}
+	if !bytes.Contains(out, []byte(`"reasoning_effort":"none"`)) {
+		t.Fatalf("reasoning_effort was not patched to none: %s", out)
 	}
 	if bytes.Contains(out, []byte(`service_tier`)) {
 		t.Fatalf("service_tier was not removed: %s", out)
